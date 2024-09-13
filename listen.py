@@ -6,6 +6,7 @@ Example of how to request a message in a desired interval
 # pylint: disable=W0702
 
 import time
+import math
 # Import mavutil
 from pymavlink import mavutil
 
@@ -45,12 +46,12 @@ while True:
         # Check if the message is of type 'ATTITUDE'
         if message['mavpackettype'] == 'ATTITUDE':
             # Extract the roll, pitch, and yaw values and format them to 3 decimal places
-            roll = round(message['roll'], 3)
-            pitch = round(message['pitch'], 3)
-            yaw = round(message['yaw'], 3)
+            roll = round(math.degrees(message['roll']), 3)
+            pitch = round(math.degrees(message['pitch']), 3)
+            yaw = round(math.degrees(message['yaw']), 3)
             
             # Print the formatted output
-            print(f"Roll: {roll}, Pitch: {pitch}, Yaw: {yaw}")
+            print(f"Roll: {roll}°, Pitch: {pitch}°, Yaw: {yaw}°")
     except:
         pass
     
