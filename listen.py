@@ -35,7 +35,7 @@ def request_message_interval(message_id: int, frequency_hz: float):
     )
 
 # Configure ATTITUDE message to be sent at 2Hz
-request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, 100)
+request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, 10)
 
 # Get some information !
 while True:
