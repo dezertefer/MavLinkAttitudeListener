@@ -6,15 +6,17 @@ from pymavlink import mavutil
 
 # Create the connection
 master = mavutil.mavlink_connection("/dev/serial0", baud=921600)
-#master.serial.flushInput()
 master.wait_heartbeat()
+
+# Flush serial buffer if using serial connection
 if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
     master.port.flushInput()  # Flush the serial input buffer
+
 # WebSocket URL
 ws_url = "ws://18.234.27.121:8085"
 
 # Set default frequency for attitude messages (in Hz)
-attitude_frequency = 100  # Default frequency at startup
+attitude_frequency = 10  # Default frequency at startup
 debug_console = False  # Debug console is disabled by default
 
 # Conversion functions
@@ -23,7 +25,6 @@ def radians_to_degrees(rad):
 
 def limit_angle(angle):
     """Limits the angle to the -45 to 45 range."""
-    # Convert radians to degrees if necessary
     if angle < -45:
         return -45
     elif angle > 45:
@@ -32,7 +33,6 @@ def limit_angle(angle):
 
 def send_ws_message(ws, yaw, pitch, roll, timestamp):
     """Send data over WebSocket."""
-    # Prepare the data in the desired format with 3 decimal places
     data = {
         "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
         "timestamp": timestamp,
@@ -40,7 +40,6 @@ def send_ws_message(ws, yaw, pitch, roll, timestamp):
     }
 
     try:
-        # Convert the dictionary to a JSON string and send it via WebSocket
         ws.send(str(data).replace("'", '"'))  # Ensure correct JSON format
     except websocket.WebSocketConnectionClosedException as e:
         print(f"WebSocket error: {e}")
@@ -101,7 +100,7 @@ def main():
     while True:
         try:
             # Receive the MAVLink message
-            message = master.recv_match()
+            message = master.recv_match(blocking=True)  # blocking=True ensures waiting for the next message
 
             if message is None:
                 continue  # Skip if no message was received
@@ -133,14 +132,10 @@ def main():
                           f"Yaw: {yaw_rad:.3f} rad, {yaw_deg:.3f} deg")
 
             elif message['mavpackettype'] == 'AHRS2':
-                # Display the entire AHRS2 message in the console
                 print("AHRS2 Message:", message)
 
         except Exception as e:
             print(f"Error: {e}")
-
-        # Sleep based on the attitude message frequency
-        time.sleep(1 / attitude_frequency)
 
 # Start the program
 main()
