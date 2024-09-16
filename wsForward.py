@@ -10,7 +10,7 @@ master = mavutil.mavlink_connection("/dev/serial0", baud=921600)
 master.wait_heartbeat()
 
 # WebSocket URL
-ws_url = "ws://3.91.74.146:8485"
+ws_url = "ws://18.234.27.121:8085"
 
 # Set default frequency for attitude messages (in Hz)
 attitude_frequency = 10  # Default frequency at startup
