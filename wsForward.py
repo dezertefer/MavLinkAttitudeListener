@@ -22,7 +22,6 @@ def radians_to_degrees(rad):
 
 def limit_angle(angle):
     """Limits the angle to the -45 to 45 range, converts -45 to 315 degrees."""
-    
     if 0 <= angle < 45:
         return angle
     elif 315 <= angle < 360:
@@ -31,20 +30,21 @@ def limit_angle(angle):
         return -45
     elif 45 < angle <= 180:
         return 45
-return 0
+    return 0  # Default return for undefined cases
 
-async def send_ws_message(yaw, pitch, roll, timestamp):
-    async with websockets.connect(ws_url) as websocket:
-        # Prepare the data in the desired format with 3 decimal places
-        data = {
-            "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
-            "timestamp": timestamp,
-            "accuracy": 3
-        }
-        
-        # Convert the dictionary to a JSON string
-        message = str(data).replace("'", '"')  # Ensure correct JSON format
-        await websocket.send(message)
+async def send_ws_message(websocket, yaw, pitch, roll, timestamp):
+    # Prepare the data in the desired format with 3 decimal places
+    data = {
+        "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
+        "timestamp": timestamp,
+        "accuracy": 3
+    }
+    
+    # Convert the dictionary to a JSON string and send it via WebSocket
+    try:
+        await websocket.send(str(data).replace("'", '"'))  # Ensure correct JSON format
+    except websockets.exceptions.ConnectionClosedError as e:
+        print(f"WebSocket error: {e}")
 
 def request_message_interval(message_id: int, frequency_hz: float):
     """Request MAVLink message at a desired frequency."""
@@ -94,46 +94,51 @@ def menu():
 # Start the menu in a separate thread
 threading.Thread(target=menu, daemon=True).start()
 
-# Main loop to receive MAVLink messages and send over WebSocket
-while True:
-    try:
-        # Receive the message
-        message = master.recv_match()
+async def main():
+    # Open WebSocket connection
+    async with websockets.connect(ws_url) as websocket:
+        while True:
+            try:
+                # Receive the message
+                message = master.recv_match()
 
-        if message is None:
-            continue  # Skip if no message was received
+                if message is None:
+                    continue  # Skip if no message was received
 
-        message = message.to_dict()
+                message = message.to_dict()
 
-        if message['mavpackettype'] == 'ATTITUDE':
-            # Get raw roll, pitch, and yaw values in radians
-            roll_rad = message['roll']
-            pitch_rad = message['pitch']
-            yaw_rad = message['yaw']
-            
-            # Convert and limit roll and pitch to degrees
-            roll_deg = round(limit_angle(radians_to_degrees(roll_rad)), 3)
-            pitch_deg = round(limit_angle(radians_to_degrees(pitch_rad)), 3)
-            yaw_deg = round(radians_to_degrees(yaw_rad) % 360, 3)  # Yaw can be 0 to 360 degrees
-            
-            # Get the current timestamp in milliseconds
-            timestamp = int(time.time() * 1000)
-            
-            # Send via WebSocket
-            asyncio.run(send_ws_message(yaw_deg, pitch_deg, roll_deg, timestamp))
-            
-            # Print pitch, roll, yaw in both radians and degrees if debug mode is enabled
-            if debug_console:
-                print(f"Debug - Roll: {roll_rad:.3f} rad, {roll_deg:.3f} deg | "
-                      f"Pitch: {pitch_rad:.3f} rad, {pitch_deg:.3f} deg | "
-                      f"Yaw: {yaw_rad:.3f} rad, {yaw_deg:.3f} deg")
+                if message['mavpackettype'] == 'ATTITUDE':
+                    # Get raw roll, pitch, and yaw values in radians
+                    roll_rad = message['roll']
+                    pitch_rad = message['pitch']
+                    yaw_rad = message['yaw']
+                    
+                    # Convert and limit roll and pitch to degrees
+                    roll_deg = round(limit_angle(radians_to_degrees(roll_rad)), 3)
+                    pitch_deg = round(limit_angle(radians_to_degrees(pitch_rad)), 3)
+                    yaw_deg = round(radians_to_degrees(yaw_rad) % 360, 3)  # Yaw can be 0 to 360 degrees
+                    
+                    # Get the current timestamp in milliseconds
+                    timestamp = int(time.time() * 1000)
+                    
+                    # Send via WebSocket
+                    await send_ws_message(websocket, yaw_deg, pitch_deg, roll_deg, timestamp)
+                    
+                    # Print pitch, roll, yaw in both radians and degrees if debug mode is enabled
+                    if debug_console:
+                        print(f"Debug - Roll: {roll_rad:.3f} rad, {roll_deg:.3f} deg | "
+                              f"Pitch: {pitch_rad:.3f} rad, {pitch_deg:.3f} deg | "
+                              f"Yaw: {yaw_rad:.3f} rad, {yaw_deg:.3f} deg")
 
-        elif message['mavpackettype'] == 'AHRS2':
-            # Display the entire AHRS2 message in the console
-            print("AHRS2 Message:", message)
+                elif message['mavpackettype'] == 'AHRS2':
+                    # Display the entire AHRS2 message in the console
+                    print("AHRS2 Message:", message)
 
-    except Exception:
-        pass  # Silently ignore errors
-    
-    # Sleep based on the attitude message frequency
-    time.sleep(1 / attitude_frequency)
+            except Exception as e:
+                print(f"Error: {e}")
+
+            # Sleep based on the attitude message frequency
+            await asyncio.sleep(1 / attitude_frequency)
+
+# Start the asyncio event loop
+asyncio.run(main())
