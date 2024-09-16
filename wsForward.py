@@ -20,7 +20,7 @@ debug_console = False  # Debug console is disabled by default
 def radians_to_degrees(rad):
     return rad * 180 / math.pi
 
-def limit_angle(angle, min_value=-45, max_value=45):
+def limit_angle(angle):
     """Limits the angle to the -45 to 45 range, converts -45 to 315 degrees."""
     
     if 0 <= angle < 45:
@@ -31,7 +31,7 @@ def limit_angle(angle, min_value=-45, max_value=45):
         return -45
     elif 45 < angle <= 180:
         return 45
-
+return 0
 
 async def send_ws_message(yaw, pitch, roll, timestamp):
     async with websockets.connect(ws_url) as websocket:
