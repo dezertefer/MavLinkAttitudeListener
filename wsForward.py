@@ -27,11 +27,18 @@ def radians_to_degrees(rad):
 
 def limit_angle(angle, min_value=-45, max_value=45):
     """Limits the angle to the -45 to 45 range, converts -45 to 315 degrees."""
-    if angle < min_value:
-        return 315
-    elif angle > max_value:
-        return max_value
-    return angle
+    
+    if 0 <= angle < 45:
+        return angle
+    elif 315 <= angle < 360:
+        return -(360 - angle)
+    elif 180 < angle < 315:
+        return -45
+    elif 45 < angle < 180:
+        return 45
+
+    # If the angle doesn't fit into any of the above categories
+    return max_value if angle > max_value else min_value
 
 async def send_ws_message(roll, pitch, yaw):
     async with websockets.connect(ws_url) as websocket:
