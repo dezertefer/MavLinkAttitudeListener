@@ -108,6 +108,8 @@ async def main():
                 message = message.to_dict()
 
                 if message['mavpackettype'] == 'ATTITUDE':
+                    
+                    print(f"Received ATTITUDE message: {message}")
                     # Get raw roll, pitch, and yaw values in radians
                     roll_rad = message['roll']
                     pitch_rad = message['pitch']
