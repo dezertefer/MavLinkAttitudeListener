@@ -14,7 +14,7 @@ if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
 ws_url = "ws://18.234.27.121:8085"
 
 # Set default frequency for attitude messages (in Hz)
-attitude_frequency = 10  # Default frequency at startup
+attitude_frequency = 100  # Default frequency at startup
 debug_console = False  # Debug console is disabled by default
 
 # Conversion functions
