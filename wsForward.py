@@ -106,16 +106,16 @@ async def main():
 
                 if message['mavpackettype'] == 'ATTITUDE':
                     
-                    print(f"Received ATTITUDE message: {message}")
+                    #print(f"Received ATTITUDE message: {message}")
                     # Get raw roll, pitch, and yaw values in radians
                     roll_rad = message['roll']
                     pitch_rad = message['pitch']
                     yaw_rad = message['yaw']
                     
                     # Convert and limit roll and pitch to degrees
-                    roll_deg = round(limit_angle(radians_to_degrees(roll_rad)), 3)
-                    pitch_deg = round(limit_angle(radians_to_degrees(pitch_rad)), 3)
-                    yaw_deg = round(radians_to_degrees(yaw_rad) % 360, 3)  # Yaw can be 0 to 360 degrees
+                    roll_deg = round(limit_angle(math.degrees(roll_rad)), 3)
+                    pitch_deg = round(limit_angle(math.degrees(pitch_rad)), 3)
+                    yaw_deg = round(math.degrees(yaw_rad), 3)  # Yaw can be 0 to 360 degrees
                     
                     # Get the current timestamp in milliseconds
                     timestamp = int(time.time() * 1000)
