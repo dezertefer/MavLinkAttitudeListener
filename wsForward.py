@@ -21,16 +21,13 @@ def radians_to_degrees(rad):
     return rad * 180 / math.pi
 
 def limit_angle(angle):
-    """Limits the angle to the -45 to 45 range, converts -45 to 315 degrees."""
-    if 0 <= angle < 45:
-        return angle
-    elif 315 <= angle < 360:
-        return -(360 - angle)
-    elif 180 < angle < 315:
+    """Limits the angle to the -45 to 45 range."""
+    # Convert radians to degrees if necessary
+    if angle < -45:
         return -45
-    elif 45 < angle <= 180:
+    elif angle > 45:
         return 45
-    return 0  # Default return for undefined cases
+    return angle
 
 async def send_ws_message(websocket, yaw, pitch, roll, timestamp):
     # Prepare the data in the desired format with 3 decimal places
