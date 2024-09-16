@@ -14,6 +14,7 @@ ws_url = "ws://3.91.74.146:8485"
 
 # Set default frequency for attitude messages (in Hz)
 attitude_frequency = 10  # Default frequency at startup
+debug_console = False  # Debug console is disabled by default
 
 # Conversion functions
 def radians_to_degrees(rad):
@@ -46,19 +47,6 @@ async def send_ws_message(yaw, pitch, roll, timestamp):
         message = str(data).replace("'", '"')  # Ensure correct JSON format
         await websocket.send(message)
 
-def update_request_interval():
-    """Allows the user to update the attitude message frequency."""
-    global attitude_frequency
-    while True:
-        try:
-            # Get the new frequency from the user
-            new_frequency = float(input("Enter new frequency for attitude messages: "))
-            attitude_frequency = new_frequency
-            request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, new_frequency)
-            print(f"Updated attitude message frequency to {new_frequency} Hz")
-        except ValueError:
-            print("Invalid frequency. Please enter a number.")
-
 def request_message_interval(message_id: int, frequency_hz: float):
     """Request MAVLink message at a desired frequency."""
     master.mav.command_long_send(
@@ -67,8 +55,45 @@ def request_message_interval(message_id: int, frequency_hz: float):
         message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
     )
 
-# Start a thread to listen for user input and update the frequency
-threading.Thread(target=update_request_interval, daemon=True).start()
+# Function to handle the menu
+def menu():
+    global attitude_frequency, debug_console
+
+    while True:
+        print("\nMenu:")
+        print("1. Change frequency (type: frequency <value>)")
+        print("2. Enable/Disable debug console (type: debug on/off)")
+        print("3. Exit")
+
+        choice = input("Enter your choice: ").strip()
+
+        if choice.startswith("frequency"):
+            try:
+                # Parse the frequency value from the input
+                new_frequency = float(choice.split()[1])
+                attitude_frequency = new_frequency
+                request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, new_frequency)
+                print(f"Updated attitude message frequency to {new_frequency} Hz")
+            except (IndexError, ValueError):
+                print("Invalid input. Please enter a valid frequency like 'frequency 10'.")
+
+        elif choice == "debug on":
+            debug_console = True
+            print("Debug console enabled. Pitch, roll, and yaw will be printed.")
+
+        elif choice == "debug off":
+            debug_console = False
+            print("Debug console disabled.")
+
+        elif choice == "exit":
+            print("Exiting the program...")
+            break
+
+        else:
+            print("Invalid option. Please try again.")
+
+# Start the menu in a separate thread
+threading.Thread(target=menu, daemon=True).start()
 
 # Main loop to receive MAVLink messages and send over WebSocket
 while True:
@@ -92,7 +117,11 @@ while True:
             
             # Send via WebSocket
             asyncio.run(send_ws_message(yaw, pitch, roll, timestamp))
-        
+            
+            # Print pitch, roll, yaw if debug mode is enabled
+            if debug_console:
+                print(f"Debug - Roll: {roll}, Pitch: {pitch}, Yaw: {yaw}")
+
         elif message['mavpackettype'] == 'AHRS2':
             # Display the entire AHRS2 message in the console
             print("AHRS2 Message:", message)
