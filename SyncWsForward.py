@@ -22,6 +22,7 @@ debug_console = False  # Debug console is disabled by default
 # Reverse control for roll and pitch
 reverse_roll = False  # Reverse roll disabled by default
 reverse_pitch = False  # Reverse pitch disabled by default
+swap_roll_pitch = False  # Swap roll and pitch disabled by default
 
 # Conversion functions
 def radians_to_degrees(rad):
@@ -58,7 +59,7 @@ def request_message_interval(message_id: int, frequency_hz: float):
 
 # Function to handle the menu
 def menu():
-    global attitude_frequency, debug_console, reverse_roll, reverse_pitch
+    global attitude_frequency, debug_console, reverse_roll, reverse_pitch, swap_roll_pitch
 
     while True:
         print("\nMenu:")
@@ -66,7 +67,8 @@ def menu():
         print("2. Enable/Disable debug console (type: debug on/off)")
         print("3. Reverse roll (type: reverse roll on/off)")
         print("4. Reverse pitch (type: reverse pitch on/off)")
-        print("5. Exit")
+        print("5. Swap roll and pitch (type: swap on/off)")
+        print("6. Exit")
 
         choice = input("Enter your choice: ").strip()
 
@@ -103,6 +105,14 @@ def menu():
         elif choice == "reverse pitch off":
             reverse_pitch = False
             print("Pitch values will no longer be reversed.")
+
+        elif choice == "swap on":
+            swap_roll_pitch = True
+            print("Roll and pitch will be swapped.")
+
+        elif choice == "swap off":
+            swap_roll_pitch = False
+            print("Roll and pitch will no longer be swapped.")
 
         elif choice == "exit":
             print("Exiting the program...")
@@ -146,7 +156,11 @@ def main():
                     roll_deg = -roll_deg
                 if reverse_pitch:
                     pitch_deg = -pitch_deg
-                
+
+                # Swap roll and pitch if enabled
+                if swap_roll_pitch:
+                    roll_deg, pitch_deg = pitch_deg, roll_deg
+
                 # Get the current timestamp in milliseconds
                 timestamp = int(time.time() * 1000)
 
