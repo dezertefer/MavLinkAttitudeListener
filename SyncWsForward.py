@@ -6,9 +6,10 @@ from pymavlink import mavutil
 
 # Create the connection
 master = mavutil.mavlink_connection("/dev/serial0", baud=921600)
-master.serial.flushInput()
+#master.serial.flushInput()
 master.wait_heartbeat()
-
+if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
+    master.port.flushInput()  # Flush the serial input buffer
 # WebSocket URL
 ws_url = "ws://18.234.27.121:8085"
 
