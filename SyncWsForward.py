@@ -19,6 +19,10 @@ ws_url = "ws://18.234.27.121:8085"
 attitude_frequency = 10  # Default frequency at startup
 debug_console = False  # Debug console is disabled by default
 
+# Reverse control for roll and pitch
+reverse_roll = False  # Reverse roll disabled by default
+reverse_pitch = False  # Reverse pitch disabled by default
+
 # Conversion functions
 def radians_to_degrees(rad):
     return rad * 180 / math.pi
@@ -54,13 +58,15 @@ def request_message_interval(message_id: int, frequency_hz: float):
 
 # Function to handle the menu
 def menu():
-    global attitude_frequency, debug_console
+    global attitude_frequency, debug_console, reverse_roll, reverse_pitch
 
     while True:
         print("\nMenu:")
         print("1. Change frequency (type: frequency <value>)")
         print("2. Enable/Disable debug console (type: debug on/off)")
-        print("3. Exit")
+        print("3. Reverse roll (type: reverse roll on/off)")
+        print("4. Reverse pitch (type: reverse pitch on/off)")
+        print("5. Exit")
 
         choice = input("Enter your choice: ").strip()
 
@@ -81,6 +87,22 @@ def menu():
         elif choice == "debug off":
             debug_console = False
             print("Debug console disabled.")
+
+        elif choice == "reverse roll on":
+            reverse_roll = True
+            print("Roll values will be reversed.")
+
+        elif choice == "reverse roll off":
+            reverse_roll = False
+            print("Roll values will no longer be reversed.")
+
+        elif choice == "reverse pitch on":
+            reverse_pitch = True
+            print("Pitch values will be reversed.")
+
+        elif choice == "reverse pitch off":
+            reverse_pitch = False
+            print("Pitch values will no longer be reversed.")
 
         elif choice == "exit":
             print("Exiting the program...")
@@ -118,6 +140,12 @@ def main():
                 roll_deg = round(limit_angle(math.degrees(roll_rad)), 3)
                 pitch_deg = round(limit_angle(math.degrees(pitch_rad)), 3)
                 yaw_deg = round(math.degrees(yaw_rad), 3)  # Yaw can be 0 to 360 degrees
+
+                # Apply roll or pitch reversal if enabled
+                if reverse_roll:
+                    roll_deg = -roll_deg
+                if reverse_pitch:
+                    pitch_deg = -pitch_deg
                 
                 # Get the current timestamp in milliseconds
                 timestamp = int(time.time() * 1000)
