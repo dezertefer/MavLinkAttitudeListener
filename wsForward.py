@@ -106,7 +106,7 @@ async def main():
 
                 if message['mavpackettype'] == 'ATTITUDE':
                     
-                    #print(f"Received ATTITUDE message: {message}")
+                    print(f"Received ATTITUDE message: {message}")
                     # Get raw roll, pitch, and yaw values in radians
                     roll_rad = message['roll']
                     pitch_rad = message['pitch']
@@ -120,7 +120,7 @@ async def main():
                     # Get the current timestamp in milliseconds
                     timestamp = int(time.time() * 1000)
 
-                    print(f"Yaw: {yaw_deg}, Pitch: {pitch_deg}, Roll: {roll_deg}")
+                    #print(f"Yaw: {yaw_deg}, Pitch: {pitch_deg}, Roll: {roll_deg}")
                     
                     # Send via WebSocket
                     await send_ws_message(websocket, yaw_deg, pitch_deg, roll_deg, timestamp)
