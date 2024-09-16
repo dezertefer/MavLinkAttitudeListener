@@ -109,7 +109,7 @@ async def main():
 
                 if message['mavpackettype'] == 'ATTITUDE':
                     
-                    print(f"Received ATTITUDE message: {message}")
+                    #print(f"Received ATTITUDE message: {message}")
                     # Get raw roll, pitch, and yaw values in radians
                     roll_rad = message['roll']
                     pitch_rad = message['pitch']
