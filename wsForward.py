@@ -12,8 +12,8 @@ master.wait_heartbeat()
 # WebSocket URL
 ws_url = "ws://3.91.74.146:8485"
 
-# Initial frequency for attitude messages (in Hz)
-attitude_frequency = 100
+# Set default frequency for attitude messages (in Hz)
+attitude_frequency = 10  # Default frequency at startup
 
 # Conversion functions
 def radians_to_degrees(rad):
@@ -74,8 +74,13 @@ threading.Thread(target=update_request_interval, daemon=True).start()
 while True:
     try:
         # Receive the message
-        message = master.recv_match().to_dict()
-        
+        message = master.recv_match()
+
+        if message is None:
+            continue  # Skip if no message was received
+
+        message = message.to_dict()
+
         if message['mavpackettype'] == 'ATTITUDE':
             # Convert and limit roll and pitch, rounding to 3 decimal places
             roll = round(limit_angle(radians_to_degrees(message['roll'])), 3)
@@ -92,8 +97,8 @@ while True:
             # Display the entire AHRS2 message in the console
             print("AHRS2 Message:", message)
 
-    except Exception as e:
-        print(f"Error: {e}")
+    except Exception:
+        pass  # Silently ignore errors
     
     # Sleep based on the attitude message frequency
     time.sleep(1 / attitude_frequency)
