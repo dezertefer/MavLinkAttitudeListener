@@ -79,9 +79,9 @@ while True:
             # Send via WebSocket
             asyncio.run(send_ws_message(roll, pitch, yaw))
         
-        elif message['mavpackettype'] == 'AHRS2':
-            # Display the entire AHRS2 message in the console
-            print("AHRS2 Message:", message)
+        # elif message['mavpackettype'] == 'AHRS2':
+        #     # Display the entire AHRS2 message in the console
+        #     print("AHRS2 Message:", message)
 
     except Exception as e:
         print(f"Error: {e}")
