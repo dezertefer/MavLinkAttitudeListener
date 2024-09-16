@@ -119,6 +119,8 @@ async def main():
                     
                     # Get the current timestamp in milliseconds
                     timestamp = int(time.time() * 1000)
+
+                    print(f"Yaw: {yaw_deg}, Pitch: {pitch_deg}, Roll: {roll_deg}")
                     
                     # Send via WebSocket
                     await send_ws_message(websocket, yaw_deg, pitch_deg, roll_deg, timestamp)
