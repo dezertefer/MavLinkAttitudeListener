@@ -12,6 +12,9 @@ master.wait_heartbeat()
 # WebSocket URL
 ws_url = "ws://3.91.74.146:8485"
 
+# Initial frequency for attitude messages (in Hz)
+attitude_frequency = 100
+
 # Conversion functions
 def radians_to_degrees(rad):
     return rad * 180 / math.pi
@@ -32,9 +35,9 @@ def limit_angle(angle, min_value=-45, max_value=45):
 
 async def send_ws_message(yaw, pitch, roll, timestamp):
     async with websockets.connect(ws_url) as websocket:
-        # Prepare the data in the desired format
+        # Prepare the data in the desired format with 3 decimal places
         data = {
-            "values": [yaw, pitch, roll],
+            "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
             "timestamp": timestamp,
             "accuracy": 3
         }
@@ -42,14 +45,15 @@ async def send_ws_message(yaw, pitch, roll, timestamp):
         # Convert the dictionary to a JSON string
         message = str(data).replace("'", '"')  # Ensure correct JSON format
         await websocket.send(message)
-        print(f"Sent via WebSocket: {message}")
 
 def update_request_interval():
     """Allows the user to update the attitude message frequency."""
+    global attitude_frequency
     while True:
         try:
             # Get the new frequency from the user
             new_frequency = float(input("Enter new frequency for attitude messages: "))
+            attitude_frequency = new_frequency
             request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, new_frequency)
             print(f"Updated attitude message frequency to {new_frequency} Hz")
         except ValueError:
@@ -73,16 +77,13 @@ while True:
         message = master.recv_match().to_dict()
         
         if message['mavpackettype'] == 'ATTITUDE':
-            # Convert and limit roll and pitch
-            roll = limit_angle(radians_to_degrees(message['roll']))
-            pitch = limit_angle(radians_to_degrees(message['pitch']))
-            yaw = radians_to_degrees(message['yaw']) % 360  # Yaw can be 0 to 360 degrees
+            # Convert and limit roll and pitch, rounding to 3 decimal places
+            roll = round(limit_angle(radians_to_degrees(message['roll'])), 3)
+            pitch = round(limit_angle(radians_to_degrees(message['pitch'])), 3)
+            yaw = round(radians_to_degrees(message['yaw']) % 360, 3)  # Yaw can be 0 to 360 degrees
             
             # Get the current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
-            
-            # Print the formatted output
-            print(f"Roll: {roll}, Pitch: {pitch}, Yaw: {yaw}")
             
             # Send via WebSocket
             asyncio.run(send_ws_message(yaw, pitch, roll, timestamp))
@@ -94,5 +95,5 @@ while True:
     except Exception as e:
         print(f"Error: {e}")
     
-    # Sleep for the appropriate interval to match your message request rate
-    time.sleep(0.01)
+    # Sleep based on the attitude message frequency
+    time.sleep(1 / attitude_frequency)
