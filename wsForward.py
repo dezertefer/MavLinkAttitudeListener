@@ -1,0 +1,83 @@
+import time
+import math
+import asyncio
+import websockets
+import threading
+from pymavlink import mavutil
+
+# Create the connection
+master = mavutil.mavlink_connection("/dev/serial0", baud=921600)
+# Wait a heartbeat before sending commands
+master.wait_heartbeat()
+
+# WebSocket URL
+ws_url = "ws://3.91.74.146:8485"
+
+def request_message_interval(message_id: int, frequency_hz: float):
+    """Request MAVLink message at a desired frequency."""
+    master.mav.command_long_send(
+        master.target_system, master.target_component,
+        mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
+        message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
+    )
+
+# Conversion functions
+def radians_to_degrees(rad):
+    return rad * 180 / math.pi
+
+def limit_angle(angle, min_value=-45, max_value=45):
+    """Limits the angle to the -45 to 45 range, converts -45 to 315 degrees."""
+    if angle < min_value:
+        return 315
+    elif angle > max_value:
+        return max_value
+    return angle
+
+async def send_ws_message(roll, pitch, yaw):
+    async with websockets.connect(ws_url) as websocket:
+        # Prepare and send the formatted message
+        message = f"Roll: {roll}, Pitch: {pitch}, Yaw: {yaw}"
+        await websocket.send(message)
+        print(f"Sent via WebSocket: {message}")
+
+def update_request_interval():
+    """Allows the user to update the attitude message frequency."""
+    while True:
+        try:
+            # Get the new frequency from the user
+            new_frequency = float(input("Enter new frequency for attitude messages: "))
+            request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, new_frequency)
+            print(f"Updated attitude message frequency to {new_frequency} Hz")
+        except ValueError:
+            print("Invalid frequency. Please enter a number.")
+
+# Start a thread to listen for user input and update the frequency
+threading.Thread(target=update_request_interval, daemon=True).start()
+
+# Get messages from MAVLink
+while True:
+    try:
+        # Receive the message
+        message = master.recv_match().to_dict()
+        
+        if message['mavpackettype'] == 'ATTITUDE':
+            # Convert and limit roll and pitch
+            roll = limit_angle(radians_to_degrees(message['roll']))
+            pitch = limit_angle(radians_to_degrees(message['pitch']))
+            yaw = radians_to_degrees(message['yaw']) % 360  # Yaw can be 0 to 360 degrees
+            
+            # Print the formatted output
+            print(f"Roll: {roll}, Pitch: {pitch}, Yaw: {yaw}")
+            
+            # Send via WebSocket
+            asyncio.run(send_ws_message(roll, pitch, yaw))
+        
+        elif message['mavpackettype'] == 'AHRS2':
+            # Display the entire AHRS2 message in the console
+            print("AHRS2 Message:", message)
+
+    except Exception as e:
+        print(f"Error: {e}")
+    
+    # Sleep for the appropriate interval to match your message request rate
+    time.sleep(0.01)
