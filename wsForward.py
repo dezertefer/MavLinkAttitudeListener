@@ -107,20 +107,27 @@ while True:
         message = message.to_dict()
 
         if message['mavpackettype'] == 'ATTITUDE':
-            # Convert and limit roll and pitch, rounding to 3 decimal places
-            roll = round(limit_angle(radians_to_degrees(message['roll'])), 3)
-            pitch = round(limit_angle(radians_to_degrees(message['pitch'])), 3)
-            yaw = round(radians_to_degrees(message['yaw']) % 360, 3)  # Yaw can be 0 to 360 degrees
+            # Get raw roll, pitch, and yaw values in radians
+            roll_rad = message['roll']
+            pitch_rad = message['pitch']
+            yaw_rad = message['yaw']
+            
+            # Convert and limit roll and pitch to degrees
+            roll_deg = round(limit_angle(radians_to_degrees(roll_rad)), 3)
+            pitch_deg = round(limit_angle(radians_to_degrees(pitch_rad)), 3)
+            yaw_deg = round(radians_to_degrees(yaw_rad) % 360, 3)  # Yaw can be 0 to 360 degrees
             
             # Get the current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
             
             # Send via WebSocket
-            asyncio.run(send_ws_message(yaw, pitch, roll, timestamp))
+            asyncio.run(send_ws_message(yaw_deg, pitch_deg, roll_deg, timestamp))
             
-            # Print pitch, roll, yaw if debug mode is enabled
+            # Print pitch, roll, yaw in both radians and degrees if debug mode is enabled
             if debug_console:
-                print(f"Debug - Roll: {roll}, Pitch: {pitch}, Yaw: {yaw}")
+                print(f"Debug - Roll: {roll_rad:.3f} rad, {roll_deg:.3f} deg | "
+                      f"Pitch: {pitch_rad:.3f} rad, {pitch_deg:.3f} deg | "
+                      f"Yaw: {yaw_rad:.3f} rad, {yaw_deg:.3f} deg")
 
         elif message['mavpackettype'] == 'AHRS2':
             # Display the entire AHRS2 message in the console
