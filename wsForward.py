@@ -29,10 +29,9 @@ def limit_angle(angle, min_value=-45, max_value=45):
         return -(360 - angle)
     elif 180 < angle < 315:
         return -45
-    elif 45 < angle < 180:
+    elif 45 < angle <= 180:
         return 45
 
-    return max_value if angle > max_value else min_value
 
 async def send_ws_message(yaw, pitch, roll, timestamp):
     async with websockets.connect(ws_url) as websocket:
