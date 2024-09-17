@@ -7,7 +7,7 @@ import json
 import os
 
 # JSON configuration file path
-config_file_path = "config.json"
+config_file_path = "/home/cdc/MavLinkAttitudeListener/config.json"
 
 # Default settings
 settings = {
