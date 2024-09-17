@@ -3,6 +3,38 @@ import math
 import threading
 import websocket
 from pymavlink import mavutil
+import json
+import os
+
+# JSON configuration file path
+config_file_path = "config.json"
+
+# Default settings
+settings = {
+    "attitude_frequency": 10,
+    "reverse_roll": False,
+    "reverse_pitch": False,
+    "swap_roll_pitch": False
+}
+
+# Function to load settings from the JSON file
+def load_config():
+    global settings
+    if os.path.exists(config_file_path):
+        with open(config_file_path, 'r') as file:
+            settings = json.load(file)
+            print("Configuration loaded:", settings)
+    else:
+        print("Configuration file not found, using default settings.")
+
+# Function to save settings to the JSON file
+def save_config():
+    with open(config_file_path, 'w') as file:
+        json.dump(settings, file, indent=4)
+    print("Configuration saved:", settings)
+
+# Load settings at the start
+load_config()
 
 # Create the connection
 master = mavutil.mavlink_connection("/dev/serial0", baud=921600)
@@ -15,14 +47,8 @@ if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
 # WebSocket URL
 ws_url = "ws://18.234.27.121:8085"
 
-# Set default frequency for attitude messages (in Hz)
-attitude_frequency = 10  # Default frequency at startup
-debug_console = False  # Debug console is disabled by default
-
-# Reverse control for roll and pitch
-reverse_roll = False  # Reverse roll disabled by default
-reverse_pitch = False  # Reverse pitch disabled by default
-swap_roll_pitch = False  # Swap roll and pitch disabled by default
+# Debug console is disabled by default
+debug_console = False  
 
 # Conversion functions
 def radians_to_degrees(rad):
@@ -59,15 +85,15 @@ def request_message_interval(message_id: int, frequency_hz: float):
 
 # Function to handle the menu
 def menu():
-    global attitude_frequency, debug_console, reverse_roll, reverse_pitch, swap_roll_pitch
+    global debug_console
 
     while True:
         print("\nMenu:")
-        print("1. Change frequency (type: frequency <value>)")
-        print("2. Enable/Disable debug console (type: debug on/off)")
-        print("3. Reverse roll (type: reverse roll on/off)")
-        print("4. Reverse pitch (type: reverse pitch on/off)")
-        print("5. Swap roll and pitch (type: swap on/off)")
+        print(f"1. Change frequency (current: {settings['attitude_frequency']} Hz)")
+        print(f"2. Enable/Disable debug console (type: debug on/off) (current: {'on' if debug_console else 'off'})")
+        print(f"3. Reverse roll (current: {'on' if settings['reverse_roll'] else 'off'})")
+        print(f"4. Reverse pitch (current: {'on' if settings['reverse_pitch'] else 'off'})")
+        print(f"5. Swap roll and pitch (current: {'on' if settings['swap_roll_pitch'] else 'off'})")
         print("6. Exit")
 
         choice = input("Enter your choice: ").strip()
@@ -76,8 +102,9 @@ def menu():
             try:
                 # Parse the frequency value from the input
                 new_frequency = float(choice.split()[1])
-                attitude_frequency = new_frequency
+                settings["attitude_frequency"] = new_frequency
                 request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, new_frequency)
+                save_config()
                 print(f"Updated attitude message frequency to {new_frequency} Hz")
             except (IndexError, ValueError):
                 print("Invalid input. Please enter a valid frequency like 'frequency 10'.")
@@ -91,27 +118,33 @@ def menu():
             print("Debug console disabled.")
 
         elif choice == "reverse roll on":
-            reverse_roll = True
+            settings["reverse_roll"] = True
+            save_config()
             print("Roll values will be reversed.")
 
         elif choice == "reverse roll off":
-            reverse_roll = False
+            settings["reverse_roll"] = False
+            save_config()
             print("Roll values will no longer be reversed.")
 
         elif choice == "reverse pitch on":
-            reverse_pitch = True
+            settings["reverse_pitch"] = True
+            save_config()
             print("Pitch values will be reversed.")
 
         elif choice == "reverse pitch off":
-            reverse_pitch = False
+            settings["reverse_pitch"] = False
+            save_config()
             print("Pitch values will no longer be reversed.")
 
         elif choice == "swap on":
-            swap_roll_pitch = True
+            settings["swap_roll_pitch"] = True
+            save_config()
             print("Roll and pitch will be swapped.")
 
         elif choice == "swap off":
-            swap_roll_pitch = False
+            settings["swap_roll_pitch"] = False
+            save_config()
             print("Roll and pitch will no longer be swapped.")
 
         elif choice == "exit":
@@ -152,13 +185,13 @@ def main():
                 yaw_deg = round(math.degrees(yaw_rad), 3)  # Yaw can be 0 to 360 degrees
 
                 # Apply roll or pitch reversal if enabled
-                if reverse_roll:
+                if settings["reverse_roll"]:
                     roll_deg = -roll_deg
-                if reverse_pitch:
+                if settings["reverse_pitch"]:
                     pitch_deg = -pitch_deg
 
                 # Swap roll and pitch if enabled
-                if swap_roll_pitch:
+                if settings["swap_roll_pitch"]:
                     roll_deg, pitch_deg = pitch_deg, roll_deg
 
                 # Get the current timestamp in milliseconds
