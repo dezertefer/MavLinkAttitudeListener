@@ -31,7 +31,7 @@ def load_config():
     if os.path.exists(config_file_path):
         with open(config_file_path, 'r') as file:
             settings.update(json.load(file))
-            print("Configuration loaded:", settings)
+            print("Configuration reloaded:", settings)
     else:
         print("Configuration file not found, using default settings.")
 
@@ -108,6 +108,8 @@ def main():
             print(f"Connected to WebSocket server at {ws_url}")
 
             while True:
+                load_config()  # Reload the configuration dynamically
+
                 try:
                     # Receive the MAVLink message
                     message = master.recv_match(blocking=True)
