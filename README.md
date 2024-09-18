@@ -77,6 +77,3 @@ To remove the service:
    sudo systemctl daemon-reload
    ```
 
-## License
-
-This project is licensed under the MIT License.
