@@ -7,19 +7,19 @@ import json
 SOCKET_PATH = "/tmp/attitudeForward.sock"
 CONFIG_FILE = "/home/pi/MavLinkAttitudeListener/config.json"
 
-# Function to load and save WebSocket URL
-def save_websocket_url(new_url):
+# Function to load and save settings
+def save_config(key, value):
     try:
         with open(CONFIG_FILE, 'r') as f:
             settings = json.load(f)
-        settings['ws_url'] = new_url
+        settings[key] = value
         with open(CONFIG_FILE, 'w') as f:
             json.dump(settings, f, indent=4)
-        print(f"WebSocket URL updated to: {new_url}")
+        print(f"{key} updated to: {value}")
     except FileNotFoundError:
         print("Configuration file not found!")
     except Exception as e:
-        print(f"Error updating WebSocket URL: {e}")
+        print(f"Error updating {key}: {e}")
 
 def send_command(command):
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
@@ -45,7 +45,25 @@ if __name__ == "__main__":
             print("Usage: attitudeForward set_websocket_url <new_url>")
             sys.exit(1)
         new_url = sys.argv[2]
-        save_websocket_url(new_url)
+        save_config("ws_url", new_url)
+    elif command == "reverse_pitch_on":
+        save_config("reverse_pitch", True)
+    elif command == "reverse_pitch_off":
+        save_config("reverse_pitch", False)
+    elif command == "fix_yaw":
+        if len(sys.argv) < 3:
+            print("Usage: attitudeForward fix_yaw <angle>")
+            sys.exit(1)
+        yaw_angle = float(sys.argv[2])
+        save_config("fix_yaw_angle", yaw_angle)
+    elif command == "reverse_yaw_on":
+        save_config("reverse_yaw", True)
+    elif command == "reverse_yaw_off":
+        save_config("reverse_yaw", False)
+    elif command == "swap_roll_yaw_on":
+        save_config("swap_roll_yaw", True)
+    elif command == "swap_roll_yaw_off":
+        save_config("swap_roll_yaw", False)
     else:
         command_str = " ".join(sys.argv[1:])
         send_command(command_str)
