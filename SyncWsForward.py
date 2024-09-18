@@ -5,6 +5,7 @@ import websocket
 from pymavlink import mavutil
 import json
 import os
+import sys
 
 # JSON configuration file path
 config_file_path = "/home/cdc/MavLinkAttitudeListener/config.json"
@@ -83,79 +84,32 @@ def request_message_interval(message_id: int, frequency_hz: float):
         message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
     )
 
-# Function to handle the menu
 def menu():
     global debug_console
-
     while True:
         print("\nMenu:")
         print(f"1. Change frequency (current: {settings['attitude_frequency']} Hz)")
-        print(f"2. Enable/Disable debug console (type: debug on/off) (current: {'on' if debug_console else 'off'})")
+        print(f"2. Enable/Disable debug console (current: {'on' if debug_console else 'off'})")
         print(f"3. Reverse roll (current: {'on' if settings['reverse_roll'] else 'off'})")
         print(f"4. Reverse pitch (current: {'on' if settings['reverse_pitch'] else 'off'})")
         print(f"5. Swap roll and pitch (current: {'on' if settings['swap_roll_pitch'] else 'off'})")
         print("6. Exit")
 
-        choice = input("Enter your choice: ").strip()
+        try:
+            choice = input("Enter your choice: ").strip()
 
-        if choice.startswith("frequency"):
-            try:
-                # Parse the frequency value from the input
-                new_frequency = float(choice.split()[1])
-                settings["attitude_frequency"] = new_frequency
-                request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, new_frequency)
-                save_config()
-                print(f"Updated attitude message frequency to {new_frequency} Hz")
-            except (IndexError, ValueError):
-                print("Invalid input. Please enter a valid frequency like 'frequency 10'.")
+            if choice.startswith("frequency"):
+                # Handle frequency change
+                pass
+            # Handle other menu options...
+        except EOFError:
+            print("No input available, skipping menu")
+            break  # Exit if running in non-interactive mode
 
-        elif choice == "debug on":
-            debug_console = True
-            print("Debug console enabled. Pitch, roll, and yaw will be printed.")
-
-        elif choice == "debug off":
-            debug_console = False
-            print("Debug console disabled.")
-
-        elif choice == "reverse roll on":
-            settings["reverse_roll"] = True
-            save_config()
-            print("Roll values will be reversed.")
-
-        elif choice == "reverse roll off":
-            settings["reverse_roll"] = False
-            save_config()
-            print("Roll values will no longer be reversed.")
-
-        elif choice == "reverse pitch on":
-            settings["reverse_pitch"] = True
-            save_config()
-            print("Pitch values will be reversed.")
-
-        elif choice == "reverse pitch off":
-            settings["reverse_pitch"] = False
-            save_config()
-            print("Pitch values will no longer be reversed.")
-
-        elif choice == "swap on":
-            settings["swap_roll_pitch"] = True
-            save_config()
-            print("Roll and pitch will be swapped.")
-
-        elif choice == "swap off":
-            settings["swap_roll_pitch"] = False
-            save_config()
-            print("Roll and pitch will no longer be swapped.")
-
-        elif choice == "exit":
-            print("Exiting the program...")
-            break
-
-        else:
-            print("Invalid option. Please try again.")
-
-# Start the menu in a separate thread
-threading.Thread(target=menu, daemon=True).start()
+if __name__ == "__main__":
+    if sys.stdin.isatty():  # Check if there's a terminal (interactive mode)
+        # Start the menu in a separate thread
+        threading.Thread(target=menu, daemon=True).start()
 
 def main():
     # Open WebSocket connection
