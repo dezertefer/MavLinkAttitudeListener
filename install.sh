@@ -16,7 +16,7 @@ cd MavLinkAttitudeListener || { echo "Failed to access MavLinkAttitudeListener d
 
 # Install required Python packages
 echo "Installing Python dependencies..."
-pip3 install pymavlink websocket-client || { echo "Failed to install Python dependencies"; exit 1; }
+pip3 install --break-system-packages pymavlink websocket-client || { echo "Failed to install Python dependencies"; exit 1; }
 
 # Detect the current user
 CURRENT_USER=$(whoami)
