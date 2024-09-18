@@ -62,10 +62,10 @@ if __name__ == "__main__":
         save_config("reverse_yaw", True)
     elif command == "reverse_yaw_off":
         save_config("reverse_yaw", False)
-    elif command == "swap_yaw_roll_on":
-        save_config("swap_yaw_roll", True)
-    elif command == "swap_yaw_roll_off":
-        save_config("swap_yaw_roll", False)
+    elif command == "swap_pitch_roll_on":
+        save_config("swap_pitch_roll", True)
+    elif command == "swap_pitch_roll_off":
+        save_config("swap_pitch_roll", False)
     else:
         command_str = " ".join(sys.argv[1:])
         send_command(command_str)
