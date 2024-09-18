@@ -50,12 +50,10 @@ if __name__ == "__main__":
         save_config("reverse_pitch", True)
     elif command == "reverse_pitch_off":
         save_config("reverse_pitch", False)
-    elif command == "fix_yaw":
-        if len(sys.argv) < 3:
-            print("Usage: attitudeForward fix_yaw <angle>")
-            sys.exit(1)
-        yaw_angle = float(sys.argv[2])
-        save_config("fix_yaw_angle", yaw_angle)
+    elif command == "fix_yaw_on":
+        save_config("fix_yaw", True)
+    elif command == "fix_yaw_off":
+        save_config("fix_yaw", False)
     elif command == "reverse_yaw_on":
         save_config("reverse_yaw", True)
     elif command == "reverse_yaw_off":
@@ -64,6 +62,12 @@ if __name__ == "__main__":
         save_config("swap_roll_yaw", True)
     elif command == "swap_roll_yaw_off":
         save_config("swap_roll_yaw", False)
+    elif command == "set_fixed_yaw":
+        if len(sys.argv) < 3:
+            print("Usage: attitudeForward set_fixed_yaw <angle>")
+            sys.exit(1)
+        fixed_yaw = float(sys.argv[2])
+        save_config("fixed_yaw", fixed_yaw)
     else:
         command_str = " ".join(sys.argv[1:])
         send_command(command_str)
