@@ -107,6 +107,19 @@ def request_message_interval(message_id: int, frequency_hz: float):
         message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
     )
 
+# Function to handle commands received via the socket
+def handle_command(command):
+    global settings
+    if command.startswith("set_frequency"):
+        _, new_frequency = command.split()
+        new_frequency = float(new_frequency)
+        settings["attitude_frequency"] = new_frequency
+        save_config()  # Save the new frequency to config
+        print(f"Frequency updated to: {new_frequency}")
+        request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, new_frequency)
+    else:
+        print(f"Unknown command: {command}")
+
 # Main function
 def main():
     ws = None
@@ -128,6 +141,18 @@ def main():
             ws = websocket.WebSocket()
             ws.connect(ws_url)
             print(f"Connected to WebSocket server at {ws_url}")
+
+            # Socket handling thread
+            def socket_handler():
+                while True:
+                    conn, _ = server_socket.accept()
+                    with conn:
+                        command = conn.recv(1024).decode()
+                        if command:
+                            handle_command(command.strip())
+
+            # Start the socket handler in a separate thread
+            threading.Thread(target=socket_handler, daemon=True).start()
 
             while True:
                 load_config()  # Reload the configuration dynamically
