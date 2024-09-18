@@ -70,6 +70,8 @@ def send_ws_message(ws, yaw, pitch, roll, timestamp):
         "timestamp": timestamp,
         "accuracy": 3
     }
+    
+    print(f"Sending WebSocket message: Yaw={yaw}, Pitch={pitch}, Roll={roll}")  # Debugging message
 
     try:
         ws.send(str(data).replace("'", '"'))  # Ensure correct JSON format
@@ -86,93 +88,7 @@ def request_message_interval(message_id: int, frequency_hz: float):
         message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
     )
 
-# Function to listen for incoming commands
-def command_listener():
-    if os.path.exists(SOCKET_PATH):
-        os.remove(SOCKET_PATH)
-
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    server.bind(SOCKET_PATH)
-    server.listen(1)
-
-    print("Command listener started, waiting for commands...")
-
-    while True:
-        conn, _ = server.accept()
-        with conn:
-            command = conn.recv(1024).decode()
-            print(f"Received command: {command}")
-
-            if command == "reverse_roll_on":
-                settings["reverse_roll"] = True
-                save_config()
-                conn.sendall(b"Reverse roll set to ON\n")
-
-            elif command == "reverse_roll_off":
-                settings["reverse_roll"] = False
-                save_config()
-                conn.sendall(b"Reverse roll set to OFF\n")
-
-            elif command == "reverse_pitch_on":
-                settings["reverse_pitch"] = True
-                save_config()
-                conn.sendall(b"Reverse pitch set to ON\n")
-
-            elif command == "reverse_pitch_off":
-                settings["reverse_pitch"] = False
-                save_config()
-                conn.sendall(b"Reverse pitch set to OFF\n")
-
-            elif command == "fix_yaw_off":
-                settings["fixed_yaw_angle"] = None
-                save_config()
-                conn.sendall(b"Yaw no longer fixed\n")
-
-            elif command == "reverse_yaw_on":
-                settings["reverse_yaw"] = True
-                save_config()
-                conn.sendall(b"Yaw reversed\n")
-
-            elif command == "reverse_yaw_off":
-                settings["reverse_yaw"] = False
-                save_config()
-                conn.sendall(b"Yaw no longer reversed\n")
-
-            elif command == "swap_pitch_roll_on":
-                settings["swap_pitch_roll"] = True
-                save_config()
-                conn.sendall(b"Pitch and Roll swapped\n")
-
-            elif command == "swap_pitch_roll_off":
-                settings["swap_pitch_roll"] = False
-                save_config()
-                conn.sendall(b"Pitch and Roll no longer swapped\n")
-
-            elif command.startswith("fix_yaw"):
-                try:
-                    yaw_angle = float(command.split()[1])
-                    settings["fixed_yaw_angle"] = yaw_angle
-                    save_config()
-                    conn.sendall(f"Yaw fixed to {yaw_angle} degrees\n".encode())
-                except (IndexError, ValueError):
-                    conn.sendall(b"Invalid yaw angle\n")
-
-            elif command.startswith("set_frequency"):
-                try:
-                    frequency = float(command.split()[1])
-                    settings["attitude_frequency"] = frequency
-                    request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, frequency)
-                    save_config()
-                    conn.sendall(f"Frequency set to {frequency} Hz\n".encode())
-                except (IndexError, ValueError):
-                    conn.sendall(b"Invalid frequency command\n")
-
-            else:
-                conn.sendall(b"Unknown command\n")
-
-# Start command listener in a separate thread
-threading.Thread(target=command_listener, daemon=True).start()
-
+# Main function
 def main():
     ws = None
 
@@ -213,18 +129,23 @@ def main():
 
                         # Reverse options
                         if settings["reverse_roll"]:
+                            print("Reversing roll")
                             roll_deg = -roll_deg
                         if settings["reverse_pitch"]:
+                            print("Reversing pitch")
                             pitch_deg = -pitch_deg
                         if settings["reverse_yaw"]:
+                            print("Reversing yaw")
                             yaw_deg = -yaw_deg
 
                         # Fix yaw if applicable
                         if settings["fixed_yaw_angle"] is not None:
+                            print(f"Fixing yaw to {settings['fixed_yaw_angle']}")
                             yaw_deg = settings["fixed_yaw_angle"]
 
                         # Swap pitch and roll if enabled
                         if settings["swap_pitch_roll"]:
+                            print("Swapping pitch and roll")
                             roll_deg, pitch_deg = pitch_deg, roll_deg
 
                         timestamp = int(time.time() * 1000)
