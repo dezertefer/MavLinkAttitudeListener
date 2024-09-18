@@ -8,7 +8,7 @@ import os
 import sys
 
 # JSON configuration file path
-config_file_path = "/home/cdc/MavLinkAttitudeListener/config.json"
+config_file_path = "/home/pi/MavLinkAttitudeListener/config.json"
 
 # Default settings
 settings = {
@@ -37,7 +37,7 @@ def save_config():
 # Load settings at the start
 load_config()
 
-# Create the connection
+# Create the MAVLink connection
 master = mavutil.mavlink_connection("/dev/serial0", baud=921600)
 master.wait_heartbeat()
 
@@ -57,11 +57,7 @@ def radians_to_degrees(rad):
 
 def limit_angle(angle):
     """Limits the angle to the -45 to 45 range."""
-    if angle < -45:
-        return -45
-    elif angle > 45:
-        return 45
-    return angle
+    return max(-45, min(45, angle))
 
 def send_ws_message(ws, yaw, pitch, roll, timestamp):
     """Send data over WebSocket."""
@@ -74,7 +70,8 @@ def send_ws_message(ws, yaw, pitch, roll, timestamp):
     try:
         ws.send(str(data).replace("'", '"'))  # Ensure correct JSON format
     except websocket.WebSocketConnectionClosedException as e:
-        print(f"WebSocket error: {e}")
+        print(f"WebSocket closed: {e}")
+        raise  # Rethrow the exception to trigger reconnection
 
 def request_message_interval(message_id: int, frequency_hz: float):
     """Request MAVLink message at a desired frequency."""
@@ -112,59 +109,77 @@ if __name__ == "__main__":
         threading.Thread(target=menu, daemon=True).start()
 
 def main():
-    # Open WebSocket connection
-    ws = websocket.WebSocket()
-    ws.connect(ws_url)
+    ws = None
 
+    # Reconnection loop
     while True:
         try:
-            # Receive the MAVLink message
-            message = master.recv_match(blocking=True)  # blocking=True ensures waiting for the next message
+            # Open WebSocket connection
+            ws = websocket.WebSocket()
+            ws.connect(ws_url)
+            print(f"Connected to WebSocket server at {ws_url}")
 
-            if message is None:
-                continue  # Skip if no message was received
+            while True:
+                try:
+                    # Receive the MAVLink message
+                    message = master.recv_match(blocking=True)
 
-            message = message.to_dict()
+                    if message is None:
+                        continue
 
-            if message['mavpackettype'] == 'ATTITUDE':
-                
-                # Get raw roll, pitch, and yaw values in radians
-                roll_rad = message['roll']
-                pitch_rad = message['pitch']
-                yaw_rad = message['yaw']
-                
-                # Convert and limit roll and pitch to degrees
-                roll_deg = round(limit_angle(math.degrees(roll_rad)), 3)
-                pitch_deg = round(limit_angle(math.degrees(pitch_rad)), 3)
-                yaw_deg = round(math.degrees(yaw_rad), 3)  # Yaw can be 0 to 360 degrees
+                    message = message.to_dict()
 
-                # Apply roll or pitch reversal if enabled
-                if settings["reverse_roll"]:
-                    roll_deg = -roll_deg
-                if settings["reverse_pitch"]:
-                    pitch_deg = -pitch_deg
+                    if message['mavpackettype'] == 'ATTITUDE':
+                        # Get raw roll, pitch, and yaw values in radians
+                        roll_rad = message['roll']
+                        pitch_rad = message['pitch']
+                        yaw_rad = message['yaw']
+                        
+                        # Convert and limit roll and pitch to degrees
+                        roll_deg = round(limit_angle(math.degrees(roll_rad)), 3)
+                        pitch_deg = round(limit_angle(math.degrees(pitch_rad)), 3)
+                        yaw_deg = round(math.degrees(yaw_rad), 3)  # Yaw can be 0 to 360 degrees
 
-                # Swap roll and pitch if enabled
-                if settings["swap_roll_pitch"]:
-                    roll_deg, pitch_deg = pitch_deg, roll_deg
+                        # Apply roll or pitch reversal if enabled
+                        if settings["reverse_roll"]:
+                            roll_deg = -roll_deg
+                        if settings["reverse_pitch"]:
+                            pitch_deg = -pitch_deg
 
-                # Get the current timestamp in milliseconds
-                timestamp = int(time.time() * 1000)
+                        # Swap roll and pitch if enabled
+                        if settings["swap_roll_pitch"]:
+                            roll_deg, pitch_deg = pitch_deg, roll_deg
 
-                # Send via WebSocket
-                send_ws_message(ws, yaw_deg, pitch_deg, roll_deg, timestamp)
-                
-                # Print pitch, roll, yaw in both radians and degrees if debug mode is enabled
-                if debug_console:
-                    print(f"Debug - Roll: {roll_rad:.3f} rad, {roll_deg:.3f} deg | "
-                          f"Pitch: {pitch_rad:.3f} rad, {pitch_deg:.3f} deg | "
-                          f"Yaw: {yaw_rad:.3f} rad, {yaw_deg:.3f} deg")
+                        # Get the current timestamp in milliseconds
+                        timestamp = int(time.time() * 1000)
 
-            elif message['mavpackettype'] == 'AHRS2':
-                print("AHRS2 Message:", message)
+                        # Send via WebSocket
+                        send_ws_message(ws, yaw_deg, pitch_deg, roll_deg, timestamp)
+                        
+                        # Print debug information if enabled
+                        if debug_console:
+                            print(f"Debug - Roll: {roll_rad:.3f} rad, {roll_deg:.3f} deg | "
+                                  f"Pitch: {pitch_rad:.3f} rad, {pitch_deg:.3f} deg | "
+                                  f"Yaw: {yaw_rad:.3f} rad, {yaw_deg:.3f} deg")
+
+                    elif message['mavpackettype'] == 'AHRS2':
+                        print("AHRS2 Message:", message)
+
+                except websocket.WebSocketConnectionClosedException as e:
+                    print(f"WebSocket connection closed: {e}")
+                    break  # Exit inner loop to reconnect
+
+                except Exception as e:
+                    print(f"Error: {e}")
+                    break  # Exit inner loop to reconnect
 
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Failed to connect to WebSocket: {e}")
+            time.sleep(5)  # Wait before retrying connection
+
+        finally:
+            if ws:
+                ws.close()
 
 # Start the program
 main()
