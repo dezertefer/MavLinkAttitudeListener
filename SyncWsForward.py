@@ -182,66 +182,69 @@ def main():
 
     # Request ATTITUDE messages at the specified frequency
     request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, settings['attitude_frequency'])
-  # Reconnection loop
-while True:
-    try:
-        # Open WebSocket connection
-        ws = websocket.WebSocket()
-        ws.connect(ws_url)
-        print(f"Connected to WebSocket server at {ws_url}")
 
-        while True:
-            try:
-                # Receive the MAVLink message
-                message = master.recv_match(blocking=True)
+    # Reconnection loop
+    while True:
+        try:
+            # Open WebSocket connection
+            ws = websocket.WebSocket()
+            ws.connect(ws_url)
+            print(f"Connected to WebSocket server at {ws_url}")
 
-                if message is None:
-                    continue
+            while True:
+                try:
+                    # Receive the MAVLink message
+                    message = master.recv_match(blocking=True)
 
-                message = message.to_dict()
+                    if message is None:
+                        continue
 
-                if message['mavpackettype'] == 'ATTITUDE':
-                    roll_rad = message['roll']
-                    pitch_rad = message['pitch']
-                    yaw_rad = message['yaw']
+                    message = message.to_dict()
 
-                    # Apply any settings: reverse, swap, fixed yaw, etc.
-                    roll_deg = round(limit_angle(math.degrees(roll_rad)), 3)
-                    pitch_deg = round(limit_angle(math.degrees(pitch_rad)), 3)
-                    yaw_deg = round(math.degrees(yaw_rad), 3)
+                    if message['mavpackettype'] == 'ATTITUDE':
+                        roll_rad = message['roll']
+                        pitch_rad = message['pitch']
+                        yaw_rad = message['yaw']
 
-                    # Reverse options
-                    if settings["reverse_roll"]:
-                        roll_deg = -roll_deg
-                    if settings["reverse_pitch"]:
-                        pitch_deg = -pitch_deg
-                    if settings["reverse_yaw"]:
-                        yaw_deg = -yaw_deg
+                        # Apply any settings: reverse, swap, fixed yaw, etc.
+                        roll_deg = round(limit_angle(math.degrees(roll_rad)), 3)
+                        pitch_deg = round(limit_angle(math.degrees(pitch_rad)), 3)
+                        yaw_deg = round(math.degrees(yaw_rad), 3)
 
-                    # Fix yaw if applicable
-                    if settings["fixed_yaw_angle"] is not None:
-                        yaw_deg = settings["fixed_yaw_angle"]
+                        # Reverse options
+                        if settings["reverse_roll"]:
+                            roll_deg = -roll_deg
+                        if settings["reverse_pitch"]:
+                            pitch_deg = -pitch_deg
+                        if settings["reverse_yaw"]:
+                            yaw_deg = -yaw_deg
 
-                    # Swap pitch and roll if enabled
-                    if settings["swap_pitch_roll"]:
-                        roll_deg, pitch_deg = pitch_deg, roll_deg
+                        # Fix yaw if applicable
+                        if settings["fixed_yaw_angle"] is not None:
+                            yaw_deg = settings["fixed_yaw_angle"]
 
-                    timestamp = int(time.time() * 1000)
-                    send_ws_message(ws, yaw_deg, pitch_deg, roll_deg, timestamp)
+                        # Swap pitch and roll if enabled
+                        if settings["swap_pitch_roll"]:
+                            roll_deg, pitch_deg = pitch_deg, roll_deg
 
-            except websocket.WebSocketConnectionClosedException as e:
-                print(f"WebSocket connection closed: {e}")
-                break  # Exit inner loop to reconnect
+                        timestamp = int(time.time() * 1000)
+                        send_ws_message(ws, yaw_deg, pitch_deg, roll_deg, timestamp)
 
-            except Exception as e:
-                print(f"Error: {e}")
-                break  # Exit inner loop to reconnect
+                except websocket.WebSocketConnectionClosedException as e:
+                    print(f"WebSocket connection closed: {e}")
+                    break  # Exit inner loop to reconnect
 
-    except Exception as e:
-        print(f"Failed to connect to WebSocket: {e}")
-        time.sleep(5)
+                except Exception as e:
+                    print(f"Error: {e}")
+                    break  # Exit inner loop to reconnect
 
-    finally:
-        if ws:
-            ws.close()
-          if name == "main": main()
+        except Exception as e:
+            print(f"Failed to connect to WebSocket: {e}")
+            time.sleep(5)
+
+        finally:
+            if ws:
+                ws.close()
+
+if __name__ == "__main__":
+    main()
