@@ -81,32 +81,31 @@ def request_message_interval(message_id: int, frequency_hz: float):
         message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
     )
 
+# Menu function to run in interactive mode
 def menu():
-    global debug_console
-    while True:
-        print("\nMenu:")
-        print(f"1. Change frequency (current: {settings['attitude_frequency']} Hz)")
-        print(f"2. Enable/Disable debug console (current: {'on' if debug_console else 'off'})")
-        print(f"3. Reverse roll (current: {'on' if settings['reverse_roll'] else 'off'})")
-        print(f"4. Reverse pitch (current: {'on' if settings['reverse_pitch'] else 'off'})")
-        print(f"5. Swap roll and pitch (current: {'on' if settings['swap_roll_pitch'] else 'off'})")
-        print("6. Exit")
+    if sys.stdin.isatty():  # Only run if there is a terminal (interactive mode)
+        global debug_console
+        while True:
+            print("\nMenu:")
+            print(f"1. Change frequency (current: {settings['attitude_frequency']} Hz)")
+            print(f"2. Enable/Disable debug console (current: {'on' if debug_console else 'off'})")
+            print(f"3. Reverse roll (current: {'on' if settings['reverse_roll'] else 'off'})")
+            print(f"4. Reverse pitch (current: {'on' if settings['reverse_pitch'] else 'off'})")
+            print(f"5. Swap roll and pitch (current: {'on' if settings['swap_roll_pitch'] else 'off'})")
+            print("6. Exit")
 
-        try:
-            choice = input("Enter your choice: ").strip()
+            try:
+                choice = input("Enter your choice: ").strip()
 
-            if choice.startswith("frequency"):
-                # Handle frequency change
-                pass
-            # Handle other menu options...
-        except EOFError:
-            print("No input available, skipping menu")
-            break  # Exit if running in non-interactive mode
-
-if __name__ == "__main__":
-    if sys.stdin.isatty():  # Check if there's a terminal (interactive mode)
-        # Start the menu in a separate thread
-        threading.Thread(target=menu, daemon=True).start()
+                if choice.startswith("frequency"):
+                    # Handle frequency change
+                    pass
+                # Handle other menu options...
+            except EOFError:
+                print("No input available, skipping menu")
+                break  # Exit if running in non-interactive mode
+    else:
+        print("Running without interactive terminal, skipping menu.")
 
 def main():
     ws = None
@@ -125,11 +124,16 @@ def main():
                     message = master.recv_match(blocking=True)
 
                     if message is None:
+                        print("No MAVLink message received.")  # Log if no message is received
                         continue
+
+                    print(f"Received MAVLink message: {message}")  # Log received messages
 
                     message = message.to_dict()
 
                     if message['mavpackettype'] == 'ATTITUDE':
+                        print(f"Processing ATTITUDE message: {message}")  # Log specific ATTITUDE message
+
                         # Get raw roll, pitch, and yaw values in radians
                         roll_rad = message['roll']
                         pitch_rad = message['pitch']
@@ -155,12 +159,7 @@ def main():
 
                         # Send via WebSocket
                         send_ws_message(ws, yaw_deg, pitch_deg, roll_deg, timestamp)
-                        
-                        # Print debug information if enabled
-                        if debug_console:
-                            print(f"Debug - Roll: {roll_rad:.3f} rad, {roll_deg:.3f} deg | "
-                                  f"Pitch: {pitch_rad:.3f} rad, {pitch_deg:.3f} deg | "
-                                  f"Yaw: {yaw_rad:.3f} rad, {yaw_deg:.3f} deg")
+                        print(f"Sent message over WebSocket: Yaw={yaw_deg}, Pitch={pitch_deg}, Roll={roll_deg}, Timestamp={timestamp}")
 
                     elif message['mavpackettype'] == 'AHRS2':
                         print("AHRS2 Message:", message)
@@ -182,4 +181,10 @@ def main():
                 ws.close()
 
 # Start the program
-main()
+if __name__ == "__main__":
+    # Only run the menu in interactive mode
+    if sys.stdin.isatty():
+        threading.Thread(target=menu, daemon=True).start()
+
+    # Start the main program logic
+    main()
