@@ -14,6 +14,7 @@ This project allows you to listen to MAVLink messages, forward `ATTITUDE` messag
    ```bash
    cd MavLinkAttitudeListener
    chmod +x install.sh
+   chmod +x attitudeForward.py
    ./install.sh
    ```
 
