@@ -9,9 +9,9 @@ This project allows you to listen to MAVLink messages, forward `ATTITUDE` messag
 
 Run the installation script:
 
-cd MavLinkAttitudeListener
-chmod +x install.sh
-./install.sh
+   cd MavLinkAttitudeListener
+   chmod +x install.sh
+   ./install.sh
 This script will:
 
 Install Python and dependencies.
@@ -22,41 +22,42 @@ Start the service.
 **Commands
 To change the WebSocket URL:**
 
-./attitudeForward.py set_websocket_url <new_url>
+   ./attitudeForward.py set_websocket_url <new_url>
 
 **To enable/disable reverse roll:**
 
-./attitudeForward.py reverse_roll_on
-./attitudeForward.py reverse_roll_off
+   ./attitudeForward.py reverse_roll_on
+   ./attitudeForward.py reverse_roll_off
 
 **To set the attitude message frequency:**
 
-./attitudeForward.py set_frequency <frequency>
+   ./attitudeForward.py set_frequency <frequency>
+   
 Service Management
 The systemd service will automatically start on boot. To manually control the service:
 
 **Start the service:**
 
-
-sudo systemctl start attitudeForward.service
+   sudo systemctl start attitudeForward.service
 
 **Stop the service:**
 
-sudo systemctl stop attitudeForward.service
+   sudo systemctl stop attitudeForward.service
 
 **Check the service status:**
 
-sudo systemctl status attitudeForward.service
+   sudo systemctl status attitudeForward.service
 
 **Debugging**
 Each step of the installation process is output to the console. If you encounter an issue, check the output for errors, or review logs:
 
-sudo journalctl -u attitudeForward.service -e
-Uninstallation
+   sudo journalctl -u attitudeForward.service -e
+   
+**Uninstallation**
 
 **To remove the service:**
 
-sudo systemctl stop attitudeForward.service
-sudo systemctl disable attitudeForward.service
-sudo rm /etc/systemd/system/attitudeForward.service
-sudo systemctl daemon-reload
+   sudo systemctl stop attitudeForward.service
+   sudo systemctl disable attitudeForward.service
+   sudo rm /etc/systemd/system/attitudeForward.service
+   sudo systemctl daemon-reload
