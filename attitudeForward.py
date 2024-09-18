@@ -66,6 +66,10 @@ if __name__ == "__main__":
         save_config("swap_pitch_roll", True)
     elif command == "swap_pitch_roll_off":
         save_config("swap_pitch_roll", False)
+    elif command == "reverse_roll_on":
+        save_config("reverse_roll", True)
+    elif command == "reverse_roll_off":
+        save_config("reverse_roll", False)
     else:
         command_str = " ".join(sys.argv[1:])
         send_command(command_str)
