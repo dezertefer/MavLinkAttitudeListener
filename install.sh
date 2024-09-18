@@ -7,9 +7,6 @@ echo "Updating system and installing Python3, pip, and git..."
 sudo apt-get update
 sudo apt-get install -y python3 python3-pip git || { echo "Failed to install Python3, pip, or git"; exit 1; }
 
-# Change to the repository directory
-cd MavLinkAttitudeListener || { echo "Failed to access MavLinkAttitudeListener directory"; exit 1; }
-
 # Install required Python packages
 echo "Installing Python dependencies..."
 pip3 install --break-system-packages pymavlink websocket-client || { echo "Failed to install Python dependencies"; exit 1; }
