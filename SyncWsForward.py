@@ -12,7 +12,7 @@ import socket
 SOCKET_PATH = "/tmp/attitudeForward.sock"
 
 # JSON configuration file path
-config_file_path = "/home/pi/MavLinkAttitudeListener/config.json"
+config_file_path = "/home/cdc/MavLinkAttitudeListener/config.json" 
 
 # Default settings
 settings = {
@@ -55,6 +55,25 @@ if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
 # Debug console is disabled by default
 debug_console = False  
 
+# Socket creation function
+def create_socket():
+    # Remove the socket file if it already exists
+    if os.path.exists(SOCKET_PATH):
+        os.remove(SOCKET_PATH)
+
+    # Create a UNIX socket
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+
+    # Bind the socket to the path
+    try:
+        server.bind(SOCKET_PATH)
+        server.listen(1)  # Listen for incoming connections
+        print(f"Socket created and listening at {SOCKET_PATH}")
+    except socket.error as e:
+        print(f"Socket binding failed: {e}")
+        return None
+    return server
+
 # Conversion functions
 def radians_to_degrees(rad):
     return rad * 180 / math.pi
@@ -91,6 +110,9 @@ def request_message_interval(message_id: int, frequency_hz: float):
 # Main function
 def main():
     ws = None
+    server_socket = create_socket()  # Create the socket
+    if server_socket is None:
+        return  # Exit if socket creation failed
 
     # Load WebSocket URL from settings
     ws_url = settings.get("ws_url", "ws://18.234.27.121:8085")
@@ -168,6 +190,7 @@ def main():
         finally:
             if ws:
                 ws.close()
+            server_socket.close()  # Close the socket when done
 
 if __name__ == "__main__":
     main()
