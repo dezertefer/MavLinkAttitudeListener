@@ -7,10 +7,6 @@ echo "Updating system and installing Python3, pip, and git..."
 sudo apt-get update
 sudo apt-get install -y python3 python3-pip git || { echo "Failed to install Python3, pip, or git"; exit 1; }
 
-# Clone the repository
-echo "Cloning the MavLinkAttitudeListener repository..."
-git clone https://github.com/dezertefer/MavLinkAttitudeListener.git || { echo "Failed to clone repository"; exit 1; }
-
 # Change to the repository directory
 cd MavLinkAttitudeListener || { echo "Failed to access MavLinkAttitudeListener directory"; exit 1; }
 
