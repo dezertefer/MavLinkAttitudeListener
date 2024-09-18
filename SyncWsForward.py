@@ -19,10 +19,11 @@ settings = {
     "attitude_frequency": 10,
     "reverse_roll": False,
     "reverse_pitch": False,
-    "reverse_yaw": False,
     "swap_roll_pitch": False,
+    "fix_yaw": False,
+    "fixed_yaw": None,  # Default is no fixed yaw
+    "reverse_yaw": False,
     "swap_roll_yaw": False,
-    "fix_yaw_angle": None,
     "ws_url": "ws://18.234.27.121:8085"  # Default WebSocket URL
 }
 
@@ -124,6 +125,16 @@ def command_listener():
                 save_config()
                 conn.sendall(b"Reverse pitch set to OFF\n")
 
+            elif command == "fix_yaw_on":
+                settings["fix_yaw"] = True
+                save_config()
+                conn.sendall(b"Yaw fixed to 0\n")
+
+            elif command == "fix_yaw_off":
+                settings["fix_yaw"] = False
+                save_config()
+                conn.sendall(b"Yaw no longer fixed\n")
+
             elif command == "reverse_yaw_on":
                 settings["reverse_yaw"] = True
                 save_config()
@@ -134,24 +145,15 @@ def command_listener():
                 save_config()
                 conn.sendall(b"Reverse yaw set to OFF\n")
 
-            elif command.startswith("fix_yaw"):
-                try:
-                    yaw_angle = float(command.split()[1])
-                    settings["fix_yaw_angle"] = yaw_angle
-                    save_config()
-                    conn.sendall(f"Yaw fixed to {yaw_angle}\n".encode())
-                except (IndexError, ValueError):
-                    conn.sendall(b"Invalid yaw angle command\n")
-
             elif command == "swap_roll_yaw_on":
                 settings["swap_roll_yaw"] = True
                 save_config()
-                conn.sendall(b"Swapped roll and yaw\n")
+                conn.sendall(b"Swap roll and yaw set to ON\n")
 
             elif command == "swap_roll_yaw_off":
                 settings["swap_roll_yaw"] = False
                 save_config()
-                conn.sendall(b"Stopped swapping roll and yaw\n")
+                conn.sendall(b"Swap roll and yaw set to OFF\n")
 
             elif command.startswith("set_frequency"):
                 try:
@@ -160,16 +162,4 @@ def command_listener():
                     request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, frequency)
                     save_config()
                     conn.sendall(f"Frequency set to {frequency} Hz\n".encode())
-                except (IndexError, ValueError):
-                    conn.sendall(b"Invalid frequency command\n")
-
-            else:
-                conn.sendall(b"Unknown command\n")
-
-# Start command listener in a separate thread
-threading.Thread(target=command_listener, daemon=True).start()
-
-def main():
-    ws = None
-
-    # Load WebSocket URL
+                except (IndexError, ValueError
