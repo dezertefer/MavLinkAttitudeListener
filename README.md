@@ -45,6 +45,18 @@ This project allows you to listen to MAVLink messages, forward `ATTITUDE` messag
 
 ### To enable/disable reverse yaw:
    ```bash
+   ./attitudeForward.py fix_yaw 90
+   ./attitudeForward.py fix_yaw_off
+   ```
+
+### To enable/disable pitch & roll swap:
+   ```bash
+   ./attitudeForward.py swap_pitch_roll_on
+   ./attitudeForward.py swap_pitch_roll_off
+   ```
+
+### To enable/disable yaw fix:
+   ```bash
    ./attitudeForward.py reverse_yaw_on
    ./attitudeForward.py reverse_yaw_off
    ```
