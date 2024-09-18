@@ -5,7 +5,7 @@ import sys
 import json
 
 SOCKET_PATH = "/tmp/attitudeForward.sock"
-CONFIG_FILE = "/home/pi/MavLinkAttitudeListener/config.json"
+CONFIG_FILE = "/home/cdc/MavLinkAttitudeListener/config.json"
 
 # Function to load and save settings
 def save_config(key, value):
