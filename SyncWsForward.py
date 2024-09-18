@@ -12,7 +12,7 @@ config_file_path = "/home/pi/MavLinkAttitudeListener/config.json"
 
 # Default settings
 settings = {
-    "attitude_frequency": 10,
+    "attitude_frequency": 10,  # Default frequency for ATTITUDE messages
     "reverse_roll": False,
     "reverse_pitch": False,
     "swap_roll_pitch": False
@@ -109,6 +109,9 @@ def menu():
 
 def main():
     ws = None
+
+    # Request ATTITUDE messages at the specified frequency
+    request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, settings['attitude_frequency'])
 
     # Reconnection loop
     while True:
