@@ -19,7 +19,8 @@ settings = {
     "attitude_frequency": 10,
     "reverse_roll": False,
     "reverse_pitch": False,
-    "swap_roll_pitch": False
+    "swap_roll_pitch": False,
+    "ws_url": "ws://18.234.27.121:8085"  # Default WebSocket URL
 }
 
 # Function to load settings from the JSON file
@@ -27,7 +28,7 @@ def load_config():
     global settings
     if os.path.exists(config_file_path):
         with open(config_file_path, 'r') as file:
-            settings = json.load(file)
+            settings.update(json.load(file))
             print("Configuration loaded:", settings)
     else:
         print("Configuration file not found, using default settings.")
@@ -48,9 +49,6 @@ master.wait_heartbeat()
 # Flush serial buffer if using serial connection
 if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
     master.port.flushInput()  # Flush the serial input buffer
-
-# WebSocket URL
-ws_url = "ws://18.234.27.121:8085"
 
 # Debug console is disabled by default
 debug_console = False  
@@ -132,45 +130,62 @@ threading.Thread(target=command_listener, daemon=True).start()
 def main():
     ws = None
 
+    # Load WebSocket URL from settings
+    ws_url = settings.get("ws_url", "ws://18.234.27.121:8085")
+    print(f"Connecting to WebSocket server at {ws_url}")
+
+    # Request ATTITUDE messages at the specified frequency
     request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, settings['attitude_frequency'])
 
     # Reconnection loop
     while True:
         try:
+            # Open WebSocket connection
             ws = websocket.WebSocket()
             ws.connect(ws_url)
             print(f"Connected to WebSocket server at {ws_url}")
 
             while True:
-                message = master.recv_match(blocking=True)
+                try:
+                    # Receive the MAVLink message
+                    message = master.recv_match(blocking=True)
 
-                if message is None:
-                    continue
+                    if message is None:
+                        continue
 
-                message = message.to_dict()
+                    message = message.to_dict()
 
-                if message['mavpackettype'] == 'ATTITUDE':
-                    roll_rad = message['roll']
-                    pitch_rad = message['pitch']
-                    yaw_rad = message['yaw']
+                    if message['mavpackettype'] == 'ATTITUDE':
+                        roll_rad = message['roll']
+                        pitch_rad = message['pitch']
+                        yaw_rad = message['yaw']
 
-                    roll_deg = round(limit_angle(math.degrees(roll_rad)), 3)
-                    pitch_deg = round(limit_angle(math.degrees(pitch_rad)), 3)
-                    yaw_deg = round(math.degrees(yaw_rad), 3)
+                        roll_deg = round(limit_angle(math.degrees(roll_rad)), 3)
+                        pitch_deg = round(limit_angle(math.degrees(pitch_rad)), 3)
+                        yaw_deg = round(math.degrees(yaw_rad), 3)
 
-                    if settings["reverse_roll"]:
-                        roll_deg = -roll_deg
-                    if settings["reverse_pitch"]:
-                        pitch_deg = -pitch_deg
-                    if settings["swap_roll_pitch"]:
-                        roll_deg, pitch_deg = pitch_deg, roll_deg
+                        if settings["reverse_roll"]:
+                            roll_deg = -roll_deg
+                        if settings["reverse_pitch"]:
+                            pitch_deg = -pitch_deg
+                        if settings["swap_roll_pitch"]:
+                            roll_deg, pitch_deg = pitch_deg, roll_deg
 
-                    timestamp = int(time.time() * 1000)
-                    send_ws_message(ws, yaw_deg, pitch_deg, roll_deg, timestamp)
+                        timestamp = int(time.time() * 1000)
+                        send_ws_message(ws, yaw_deg, pitch_deg, roll_deg, timestamp)
+
+                except websocket.WebSocketConnectionClosedException as e:
+                    print(f"WebSocket connection closed: {e}")
+                    break  # Exit inner loop to reconnect
+
+                except Exception as e:
+                    print(f"Error: {e}")
+                    break  # Exit inner loop to reconnect
 
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Failed to connect to WebSocket: {e}")
             time.sleep(5)
+
         finally:
             if ws:
                 ws.close()
