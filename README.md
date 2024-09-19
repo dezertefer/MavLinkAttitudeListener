@@ -102,3 +102,17 @@ To remove the service:
    sudo systemctl daemon-reload
    ```
 
+## Possible issues
+
+Python socket doesn't have all read write permissions:
+   ```bash
+   cdc@devpi:~/MavLinkAttitudeListener $ ./attitudeForward.py set_frequency 100
+   Error sending command: [Errno 111] Connection refused
+   ```
+In this case this command fixes the issue, occurs when service installed/uninstalled multiple times
+   ```bash
+   cdc@devpi:~/MavLinkAttitudeListener $ sudo chmod 777 /tmp/attitudeForward.sock
+   cdc@devpi:~/MavLinkAttitudeListener $ sudo systemctl restart attitudeForward.service
+   ```
+
+
