@@ -1,0 +1,9 @@
+{
+    "attitude_frequency": 10,
+    "reverse_roll": false,
+    "reverse_pitch": false,
+    "swap_pitch_roll": false,
+    "reverse_yaw": false,
+    "fixed_yaw_angle": null,
+    "ws_url": "ws://18.234.27.121:8085"
+}
