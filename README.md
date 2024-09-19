@@ -4,6 +4,11 @@
 This project allows you to listen to MAVLink messages, forward `ATTITUDE` messages over a WebSocket, and control settings dynamically through a command-line interface.
 
 ## Installation
+0. Install git if not installed:
+   ```bash
+   sudo apt-get update
+   sudo apt-get install git
+   ```
 
 1. Clone the repository:
    ```bash
@@ -27,6 +32,8 @@ This project allows you to listen to MAVLink messages, forward `ATTITUDE` messag
 ## Commands
 
 ### To change the WebSocket URL:
+**IMPORTANT**: Since changing the WebSocket URL requires stopping and restarting the service,
+it is imperative to perform a **sudo reboot** after making this change.
    ```bash
    ./attitudeForward.py set_websocket_url <new_url>
    ```
