@@ -9,7 +9,7 @@ sudo apt-get install -y python3 python3-pip git || { echo "Failed to install Pyt
 
 # Install required Python packages
 echo "Installing Python dependencies..."
-pip3 install pymavlink websocket-client pyserial || { echo "Failed to install Python dependencies"; exit 1; }
+sudo pip3 install pymavlink websocket-client pyserial || { echo "Failed to install Python dependencies"; exit 1; }
 
 # Detect the current user
 CURRENT_USER=$(whoami)
