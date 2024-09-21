@@ -37,7 +37,7 @@ it is imperative to perform a **sudo reboot** after making this change.
    ```bash
    ./attitudeForward.py set_websocket_url <new_url>
    ```
-By default install.sh script installs everything for user with name "cdc". If you are willing to use different user name please change 
+By default install.sh script installs everything for user with name "cdc". If you are willing to use different user name please change:
 attitudeForward.py 
    ```bash
    CONFIG_FILE = "/home/cdc/MavLinkAttitudeListener/config.json"
