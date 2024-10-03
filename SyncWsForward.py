@@ -212,9 +212,8 @@ def marker_detection():
     # Release resources after detection
     cap.release()
 
-# Main loop without threading
 def main():
-load_config()
+    load_config()
 
     last_marker_time = time.time()
     last_attitude_time = time.time()
@@ -239,4 +238,5 @@ load_config()
             marker_detection()
             last_marker_time = current_time  # Update the last run time
 
-        # Don't use sleep; let the loop run continuously without pause
+        # The loop runs continuously without sleep, but will not block the system
+
