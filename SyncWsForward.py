@@ -222,6 +222,27 @@ def marker_detection():
 
     cap.release()
 
+def handle_command(command):
+    global attitude_running, marker_running
+    if command == "stop_attitude":
+        attitude_running = False
+        print("Attitude control stopped.")
+    elif command == "start_attitude":
+        if not attitude_running:
+            attitude_running = True
+            threading.Thread(target=attitude_control, daemon=True).start()
+            print("Attitude control started.")
+    elif command == "stop_marker":
+        marker_running = False
+        print("Marker detection stopped.")
+    elif command == "start_marker":
+        if not marker_running:
+            marker_running = True
+            threading.Thread(target=marker_detection, daemon=True).start()
+            print("Marker detection started.")
+    else:
+        print(f"Unknown command: {command}")
+
 # Main function
 def main():
     load_config()
@@ -232,19 +253,20 @@ def main():
     
     global attitude_running, marker_running
 
+    # Start attitude and marker detection threads
     if settings["enable_attitude_control"]:
         attitude_running = True
-        attitude_thread = threading.Thread(target=attitude_control)
-        attitude_thread.daemon = True
-        attitude_thread.start()
+        threading.Thread(target=attitude_control, daemon=True).start()
 
     if settings["enable_marker_detection"]:
         marker_running = True
-        marker_thread = threading.Thread(target=marker_detection)
-        marker_thread.daemon = True
-        marker_thread.start()
+        threading.Thread(target=marker_detection, daemon=True).start()
 
     while True:
+        conn, _ = server_socket.accept()
+        command = conn.recv(1024).decode().strip()
+        handle_command(command)
+        conn.close()
         time.sleep(1)
 
 if __name__ == "__main__":
