@@ -2,6 +2,9 @@ import time
 import math
 import threading
 import websocket
+import cv2
+import cv2.aruco as aruco
+import numpy as np
 from pymavlink import mavutil
 import json
 import os
@@ -10,9 +13,15 @@ import socket
 
 # Path for UNIX domain socket file
 SOCKET_PATH = "/tmp/attitudeForward.sock"
-
-# JSON configuration file path
 config_file_path = "/home/cdc/MavLinkAttitudeListener/config.json" 
+
+# Constants for ArUco detection
+PROCESSING_WIDTH = 320
+PROCESSING_HEIGHT = 320
+VIDEO_URL = 'rtsp://127.0.0.1:8554/cam'
+PROCESSING_INTERVAL = 1
+FOV_X = 4.18879  # 240 degrees in radians
+FOV_Y = 4.18879  # 240 degrees in radians
 
 # Default settings
 settings = {
@@ -22,10 +31,12 @@ settings = {
     "swap_pitch_roll": False,
     "reverse_yaw": False,
     "fixed_yaw_angle": None,
-    "ws_url": "ws://18.234.27.121:8085"  # Default WebSocket URL
+    "ws_url": "ws://18.234.27.121:8085",  # Default WebSocket URL
+    "enable_attitude_control": True,  # To control enabling/disabling of attitude
+    "enable_marker_detection": True  # To control enabling/disabling of marker detection
 }
 
-# Function to load settings from the JSON file
+# Load settings from JSON
 def load_config():
     global settings
     if os.path.exists(config_file_path):
@@ -35,7 +46,7 @@ def load_config():
     else:
         print("Configuration file not found, using default settings.")
 
-# Function to save settings to the JSON file
+# Save settings to JSON
 def save_config():
     with open(config_file_path, 'w') as file:
         json.dump(settings, file, indent=4)
@@ -52,170 +63,117 @@ master.wait_heartbeat()
 if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
     master.port.flushInput()  # Flush the serial input buffer
 
-# Debug console is disabled by default
-debug_console = False  
-
-# Socket creation function
+# Create a UNIX socket
 def create_socket():
-    # Remove the socket file if it already exists
     if os.path.exists(SOCKET_PATH):
         os.remove(SOCKET_PATH)
-
-    # Create a UNIX socket
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-
-    # Bind the socket to the path
-    try:
-        server.bind(SOCKET_PATH)
-        server.listen(1)  # Listen for incoming connections
-        print(f"Socket created and listening at {SOCKET_PATH}")
-    except socket.error as e:
-        print(f"Socket binding failed: {e}")
-        return None
+    server.bind(SOCKET_PATH)
+    server.listen(1)
+    print(f"Socket created and listening at {SOCKET_PATH}")
     return server
 
-# Conversion functions
-def radians_to_degrees(rad):
-    return rad * 180 / math.pi
+# WebSocket connection
+ws = websocket.WebSocket()
+ws.connect(settings["ws_url"])
 
-def limit_angle(angle):
-    """Limits the angle to the -45 to 45 range."""
-    return max(-45, min(45, angle))
+# MAVLink and WebSocket message functions
+def send_landing_target(angle_x, angle_y, distance=0.0):
+    """Send LANDING_TARGET message to ArduPilot"""
+    master.mav.landing_target_send(
+        int(time.time() * 1000000),
+        0, mavutil.mavlink.MAV_FRAME_BODY_NED, angle_x, angle_y, distance, 0.0, 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0], 0, 0)
 
-def send_ws_message(ws, yaw, pitch, roll, timestamp):
-    """Send data over WebSocket."""
-    data = {
-        "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
-        "timestamp": timestamp,
-        "accuracy": 3
-    }
-    
-    print(f"Sending WebSocket message: Yaw={yaw}, Pitch={pitch}, Roll={roll}")  # Debugging message
+def send_ws_message(angle_x, angle_y):
+    """Send angular offsets over WebSocket"""
+    message = f"Xangle: {angle_x:.2f}, Yangle: {angle_y:.2f}"
+    ws.send(message)
+    print(f"Sent over WebSocket: {message}")
 
-    try:
-        ws.send(str(data).replace("'", '"'))  # Ensure correct JSON format
-    except websocket.WebSocketConnectionClosedException as e:
-        print(f"WebSocket closed: {e}")
-        raise  # Rethrow the exception to trigger reconnection
-
-def request_message_interval(message_id: int, frequency_hz: float):
-    """Request MAVLink message at a desired frequency."""
-    print(f"Requesting message {message_id} at {frequency_hz} Hz")
-    master.mav.command_long_send(
-        master.target_system, master.target_component,
-        mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
-        message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
-    )
-
-# Function to handle commands received via the socket
-def handle_command(command):
-    global settings
-    if command.startswith("set_frequency"):
-        _, new_frequency = command.split()
-        new_frequency = float(new_frequency)
-        settings["attitude_frequency"] = new_frequency
-        save_config()  # Save the new frequency to config
-        print(f"Frequency updated to: {new_frequency}")
-        request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, new_frequency)
-    else:
-        print(f"Unknown command: {command}")
-
-# Main function
-def main():
-    ws = None
-    server_socket = create_socket()  # Create the socket
-    if server_socket is None:
-        return  # Exit if socket creation failed
-
-    # Load WebSocket URL from settings
-    ws_url = settings.get("ws_url", "ws://18.234.27.121:8085")
-    print(f"Connecting to WebSocket server at {ws_url}")
-
-    # Request ATTITUDE messages at the specified frequency
+# Attitude Control Logic
+def attitude_control():
     request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, settings['attitude_frequency'])
 
-    # Reconnection loop
-    while True:
+    while settings["enable_attitude_control"]:
         try:
-            # Open WebSocket connection
-            ws = websocket.WebSocket()
-            ws.connect(ws_url)
-            print(f"Connected to WebSocket server at {ws_url}")
+            load_config()  # Reload settings dynamically
+            message = master.recv_match(blocking=True)
 
-            # Socket handling thread
-            def socket_handler():
-                while True:
-                    conn, _ = server_socket.accept()
-                    with conn:
-                        command = conn.recv(1024).decode()
-                        if command:
-                            handle_command(command.strip())
+            if message and message.get_type() == 'ATTITUDE':
+                roll = math.degrees(message.roll)
+                pitch = math.degrees(message.pitch)
+                yaw = math.degrees(message.yaw)
 
-            # Start the socket handler in a separate thread
-            threading.Thread(target=socket_handler, daemon=True).start()
+                # Apply settings
+                if settings["reverse_roll"]:
+                    roll = -roll
+                if settings["reverse_pitch"]:
+                    pitch = -pitch
+                if settings["reverse_yaw"]:
+                    yaw = -yaw
+                if settings["fixed_yaw_angle"] is not None:
+                    yaw = settings["fixed_yaw_angle"]
+                if settings["swap_pitch_roll"]:
+                    roll, pitch = pitch, roll
 
-            while True:
-                load_config()  # Reload the configuration dynamically
-
-                try:
-                    # Receive the MAVLink message
-                    message = master.recv_match(blocking=True)
-
-                    if message is None:
-                        continue
-
-                    message = message.to_dict()
-
-                    if message['mavpackettype'] == 'ATTITUDE':
-                        roll_rad = message['roll']
-                        pitch_rad = message['pitch']
-                        yaw_rad = message['yaw']
-
-                        # Apply any settings: reverse, swap, fixed yaw, etc.
-                        roll_deg = round(limit_angle(math.degrees(roll_rad)), 3)
-                        pitch_deg = round(limit_angle(math.degrees(pitch_rad)), 3)
-                        yaw_deg = round(math.degrees(yaw_rad), 3)
-
-                        # Reverse options
-                        if settings["reverse_roll"]:
-                            print("Reversing roll")
-                            roll_deg = -roll_deg
-                        if settings["reverse_pitch"]:
-                            print("Reversing pitch")
-                            pitch_deg = -pitch_deg
-                        if settings["reverse_yaw"]:
-                            print("Reversing yaw")
-                            yaw_deg = -yaw_deg
-
-                        # Fix yaw if applicable
-                        if settings["fixed_yaw_angle"] is not None:
-                            print(f"Fixing yaw to {settings['fixed_yaw_angle']}")
-                            yaw_deg = settings["fixed_yaw_angle"]
-
-                        # Swap pitch and roll if enabled
-                        if settings["swap_pitch_roll"]:
-                            print("Swapping pitch and roll")
-                            roll_deg, pitch_deg = pitch_deg, roll_deg
-
-                        timestamp = int(time.time() * 1000)
-                        send_ws_message(ws, yaw_deg, pitch_deg, roll_deg, timestamp)
-
-                except websocket.WebSocketConnectionClosedException as e:
-                    print(f"WebSocket connection closed: {e}")
-                    break  # Exit inner loop to reconnect
-
-                except Exception as e:
-                    print(f"Error: {e}")
-                    break  # Exit inner loop to reconnect
-
+                send_ws_message(yaw, pitch, roll)
         except Exception as e:
-            print(f"Failed to connect to WebSocket: {e}")
-            time.sleep(5)
+            print(f"Error in attitude control: {e}")
+            break
 
-        finally:
-            if ws:
-                ws.close()
-            server_socket.close()  # Close the socket when done
+# Marker Detection Logic
+def marker_detection():
+    cap = cv2.VideoCapture(VIDEO_URL)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROCESSING_HEIGHT)
+
+    aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
+    parameters = aruco.DetectorParameters_create()
+
+    while settings["enable_marker_detection"]:
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Could not read video frame.")
+            continue
+
+        corners, ids, _ = aruco.detectMarkers(frame, aruco_dict, parameters)
+        if ids is not None:
+            for i in range(len(ids)):
+                corner = corners[i][0]
+                center_x = (corner[0][0] + corner[2][0]) / 2
+                center_y = (corner[0][1] + corner[2][1]) / 2
+                angle_x = ((center_x - PROCESSING_WIDTH / 2) / PROCESSING_WIDTH) * FOV_X
+                angle_y = ((center_y - PROCESSING_HEIGHT / 2) / PROCESSING_HEIGHT) * FOV_Y
+                send_landing_target(angle_x, angle_y)
+                send_ws_message(angle_x, angle_y)
+
+# Socket handler to start/stop attitude or marker detection
+def handle_command(command):
+    global settings
+    if command == "stop_attitude":
+        settings["enable_attitude_control"] = False
+    elif command == "start_attitude":
+        settings["enable_attitude_control"] = True
+        threading.Thread(target=attitude_control).start()
+    elif command == "stop_marker":
+        settings["enable_marker_detection"] = False
+    elif command == "start_marker":
+        settings["enable_marker_detection"] = True
+        threading.Thread(target=marker_detection).start()
+    save_config()
+
+# Main thread to listen to socket commands
+def main():
+    server_socket = create_socket()
+    threading.Thread(target=attitude_control).start()  # Start attitude control
+    threading.Thread(target=marker_detection).start()  # Start marker detection
+
+    while True:
+        conn, _ = server_socket.accept()
+        with conn:
+            command = conn.recv(1024).decode().strip()
+            if command:
+                handle_command(command)
 
 if __name__ == "__main__":
     main()
