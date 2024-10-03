@@ -20,6 +20,7 @@ PROCESSING_HEIGHT = 320
 VIDEO_URL = 'rtsp://127.0.0.1:8554/cam'
 FOV_X = 4.18879  # 240 degrees in radians
 FOV_Y = 4.18879  # 240 degrees in radians
+PROCESSING_INTERVAL = 1
 
 # Default settings
 settings = {
