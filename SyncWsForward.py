@@ -128,6 +128,7 @@ def attitude_control():
 
 # Marker Detection Logic
 def marker_detection():
+    print("Marker detection started.")  # Debugging statement
     cap = cv2.VideoCapture(VIDEO_URL)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROCESSING_HEIGHT)
@@ -141,8 +142,10 @@ def marker_detection():
             print("Error: Could not read video frame.")
             continue
 
+        print("Frame captured.")  # Debugging statement
         corners, ids, _ = aruco.detectMarkers(frame, aruco_dict, parameters)
         if ids is not None:
+            print(f"Markers detected: {ids}")  # Debugging statement
             for i in range(len(ids)):
                 corner = corners[i][0]
                 center_x = (corner[0][0] + corner[2][0]) / 2
@@ -151,6 +154,8 @@ def marker_detection():
                 angle_y = ((center_y - PROCESSING_HEIGHT / 2) / PROCESSING_HEIGHT) * FOV_Y
                 send_landing_target(angle_x, angle_y)
                 send_ws_message(angle_x, angle_y)
+        else:
+            print("No markers detected.")  # Debugging statement
 
 # Main loop without threading
 def main():
