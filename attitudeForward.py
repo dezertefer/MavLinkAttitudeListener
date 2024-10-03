@@ -70,6 +70,17 @@ if __name__ == "__main__":
         save_config("reverse_roll", True)
     elif command == "reverse_roll_off":
         save_config("reverse_roll", False)
+
+    # New commands to control attitude and marker detection
+    elif command == "start_attitude":
+        send_command("start_attitude")
+    elif command == "stop_attitude":
+        send_command("stop_attitude")
+    elif command == "start_marker":
+        send_command("start_marker")
+    elif command == "stop_marker":
+        send_command("stop_marker")
+    
     else:
         command_str = " ".join(sys.argv[1:])
         send_command(command_str)
