@@ -1,6 +1,5 @@
 import time
 import math
-import threading
 import websocket
 import cv2
 import cv2.aruco as aruco
@@ -19,7 +18,6 @@ config_file_path = "/home/cdc/MavLinkAttitudeListener/config.json"
 PROCESSING_WIDTH = 320
 PROCESSING_HEIGHT = 320
 VIDEO_URL = 'rtsp://127.0.0.1:8554/cam'
-PROCESSING_INTERVAL = 1
 FOV_X = 4.18879  # 240 degrees in radians
 FOV_Y = 4.18879  # 240 degrees in radians
 
@@ -31,9 +29,9 @@ settings = {
     "swap_pitch_roll": False,
     "reverse_yaw": False,
     "fixed_yaw_angle": None,
-    "ws_url": "ws://18.234.27.121:8085",  # Default WebSocket URL
-    "enable_attitude_control": True,  # To control enabling/disabling of attitude
-    "enable_marker_detection": True  # To control enabling/disabling of marker detection
+    "ws_url": "ws://18.234.27.121:8085",
+    "enable_attitude_control": True,
+    "enable_marker_detection": True
 }
 
 # Load settings from JSON
@@ -52,15 +50,6 @@ def save_config():
         json.dump(settings, file, indent=4)
     print("Configuration saved:", settings)
 
-def request_message_interval(message_id: int, frequency_hz: float):
-    """Request MAVLink message at a desired frequency."""
-    print(f"Requesting message {message_id} at {frequency_hz} Hz")
-    master.mav.command_long_send(
-        master.target_system, master.target_component,
-        mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
-        message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
-    )
-
 # Load settings at the start
 load_config()
 
@@ -71,16 +60,6 @@ master.wait_heartbeat()
 # Flush serial buffer if using serial connection
 if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
     master.port.flushInput()  # Flush the serial input buffer
-
-# Create a UNIX socket
-def create_socket():
-    if os.path.exists(SOCKET_PATH):
-        os.remove(SOCKET_PATH)
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    server.bind(SOCKET_PATH)
-    server.listen(1)
-    print(f"Socket created and listening at {SOCKET_PATH}")
-    return server
 
 # WebSocket connection
 ws = websocket.WebSocket()
@@ -98,6 +77,15 @@ def send_ws_message(angle_x, angle_y):
     message = f"Xangle: {angle_x:.2f}, Yangle: {angle_y:.2f}"
     ws.send(message)
     print(f"Sent over WebSocket: {message}")
+
+def request_message_interval(message_id: int, frequency_hz: float):
+    """Request MAVLink message at a desired frequency."""
+    print(f"Requesting message {message_id} at {frequency_hz} Hz")
+    master.mav.command_long_send(
+        master.target_system, master.target_component,
+        mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
+        message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
+    )
 
 # Attitude Control Logic
 def attitude_control():
@@ -141,7 +129,7 @@ def marker_detection():
 
     while settings["enable_marker_detection"]:
         ret, frame = cap.read()
-        if not ret:
+        if not ret or frame is None:
             print("Error: Could not read video frame.")
             continue
 
@@ -156,33 +144,14 @@ def marker_detection():
                 send_landing_target(angle_x, angle_y)
                 send_ws_message(angle_x, angle_y)
 
-# Socket handler to start/stop attitude or marker detection
-def handle_command(command):
-    global settings
-    if command == "stop_attitude":
-        settings["enable_attitude_control"] = False
-    elif command == "start_attitude":
-        settings["enable_attitude_control"] = True
-        threading.Thread(target=attitude_control).start()
-    elif command == "stop_marker":
-        settings["enable_marker_detection"] = False
-    elif command == "start_marker":
-        settings["enable_marker_detection"] = True
-        threading.Thread(target=marker_detection).start()
-    save_config()
-
-# Main thread to listen to socket commands
+# Main loop without threading
 def main():
-    server_socket = create_socket()
-    threading.Thread(target=attitude_control).start()  # Start attitude control
-    threading.Thread(target=marker_detection).start()  # Start marker detection
+    load_config()
+    if settings["enable_attitude_control"]:
+        attitude_control()
 
-    while True:
-        conn, _ = server_socket.accept()
-        with conn:
-            command = conn.recv(1024).decode().strip()
-            if command:
-                handle_command(command)
+    if settings["enable_marker_detection"]:
+        marker_detection()
 
 if __name__ == "__main__":
     main()
