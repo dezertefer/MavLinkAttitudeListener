@@ -226,18 +226,26 @@ def handle_command(command):
     global attitude_running, marker_running
     if command == "stop_attitude":
         attitude_running = False
+        settings["enable_attitude_control"] = False  # Update setting
+        save_config()  # Save updated setting to file
         print("Attitude control stopped.")
     elif command == "start_attitude":
         if not attitude_running:
             attitude_running = True
+            settings["enable_attitude_control"] = True  # Update setting
+            save_config()  # Save updated setting to file
             threading.Thread(target=attitude_control, daemon=True).start()
             print("Attitude control started.")
     elif command == "stop_marker":
         marker_running = False
+        settings["enable_marker_detection"] = False  # Update setting
+        save_config()  # Save updated setting to file
         print("Marker detection stopped.")
     elif command == "start_marker":
         if not marker_running:
             marker_running = True
+            settings["enable_marker_detection"] = True  # Update setting
+            save_config()  # Save updated setting to file
             threading.Thread(target=marker_detection, daemon=True).start()
             print("Marker detection started.")
     else:
