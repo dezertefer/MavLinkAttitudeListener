@@ -72,9 +72,17 @@ def send_landing_target(angle_x, angle_y, distance=0.0):
         int(time.time() * 1000000),
         0, mavutil.mavlink.MAV_FRAME_BODY_NED, angle_x, angle_y, distance, 0.0, 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0], 0, 0)
 
-def send_ws_message(angle_x, angle_y):
+def send_ws_message(*angles):
     """Send angular offsets over WebSocket"""
-    message = f"Xangle: {angle_x:.2f}, Yangle: {angle_y:.2f}"
+    if len(angles) == 3:
+        yaw, pitch, roll = angles
+        message = f"Yaw: {yaw:.2f}, Pitch: {pitch:.2f}, Roll: {roll:.2f}"
+    elif len(angles) == 2:
+        angle_x, angle_y = angles
+        message = f"Xangle: {angle_x:.2f}, Yangle: {angle_y:.2f}"
+    else:
+        raise ValueError("Invalid number of arguments for send_ws_message()")
+    
     ws.send(message)
     print(f"Sent over WebSocket: {message}")
 
