@@ -126,36 +126,97 @@ def attitude_control():
             print(f"Error in attitude control: {e}")
             break
 
-# Marker Detection Logic
 def marker_detection():
-    print("Marker detection started.")  # Debugging statement
+    # Preload ArUco marker image for testing
+    aruco_marker_image = cv2.imread('marker.jpg')
+    if aruco_marker_image is None:
+        print("Error: ArUco marker image not found.")
+        return
+
+    # Load ArUco dictionary and parameters                                      
+    aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
+    parameters = aruco.DetectorParameters_create()
+
+    print('Loading the pre-defined ArUco marker...')
+
+    # Create a margin around the pre-defined marker
+    margin_size = 20
+    color = [255, 255, 255]  # White color for margin
+
+    # Get original dimensions
+    height, width, channels = aruco_marker_image.shape
+
+    # Create a new image with margin
+    new_height = height + 2 * margin_size
+    new_width = width + 2 * margin_size
+    image_with_margin = np.full((new_height, new_width, channels), color, dtype=np.uint8)
+
+    # Place the original marker in the center of the new image
+    image_with_margin[margin_size:margin_size + height, margin_size:margin_size + width] = aruco_marker_image
+    corners, ids, rejected = aruco.detectMarkers(image_with_margin, aruco_dict, parameters=parameters)
+
+    # Check if a valid marker was found in the pre-loaded image
+    if ids is None:
+        print('Error: Invalid ArUco marker in the pre-loaded image.')
+        return
+    else:
+        print(f"Pre-loaded marker detected, ID: {ids[0][0]}")
+    
+    # Continue with live video stream detection
     cap = cv2.VideoCapture(VIDEO_URL)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROCESSING_HEIGHT)
 
-    aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
-    parameters = aruco.DetectorParameters_create()
+    if not cap.isOpened():
+        print("Error: Could not open camera.")
+        return
 
-    while settings["enable_marker_detection"]:
-        ret, frame = cap.read()
+    frn = 0
+    while True:
+        cap.grab()
+        ret, frame = cap.retrieve()
+
         if not ret or frame is None:
-            print("Error: Could not read video frame.")
+            print("Error: Frame not retrieved.")
+            break
+
+        frn += 1
+        if frn % PROCESSING_INTERVAL != 0:
             continue
 
-        print("Frame captured.")  # Debugging statement
-        corners, ids, _ = aruco.detectMarkers(frame, aruco_dict, parameters)
+        # Detect ArUco markers in the video frame
+        corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
+
         if ids is not None:
-            print(f"Markers detected: {ids}")  # Debugging statement
             for i in range(len(ids)):
-                corner = corners[i][0]
-                center_x = (corner[0][0] + corner[2][0]) / 2
-                center_y = (corner[0][1] + corner[2][1]) / 2
-                angle_x = ((center_x - PROCESSING_WIDTH / 2) / PROCESSING_WIDTH) * FOV_X
-                angle_y = ((center_y - PROCESSING_HEIGHT / 2) / PROCESSING_HEIGHT) * FOV_Y
+                detected_marker_id = ids[i][0]
+
+                # Get the corner coordinates
+                corner = corners[i].reshape((4, 2))
+                (topLeft, topRight, bottomRight, bottomLeft) = corner
+
+                x1, y1 = topLeft
+                x2, y2 = bottomRight
+                center_x = int((x1 + x2) / 2)
+                center_y = int((y1 + y2) / 2)
+
+                image_center_x = frame.shape[1] // 2
+                image_center_y = frame.shape[0] // 2
+
+                # Calculate angular offsets
+                angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
+                angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+
+                print(f"Marker Detected in video: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}")
+
+                # Send MAVLink and WebSocket messages
                 send_landing_target(angle_x, angle_y)
-                send_ws_message(angle_x, angle_y)
-        else:
-            print("No markers detected.")  # Debugging statement
+                angle_X = math.degrees(angle_x)
+                angle_Y = math.degrees(angle_y)
+                send_ws_message(angle_X, angle_Y)
+
+    # Release resources
+    cap.release()
 
 # Main loop without threading
 def main():
