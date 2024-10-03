@@ -6,6 +6,7 @@ echo "Starting MavLinkAttitudeListener installation..."
 echo "Updating system and installing Python3, pip, and git..."
 sudo apt-get update
 sudo apt-get install -y python3 python3-pip git || { echo "Failed to install Python3, pip, or git"; exit 1; }
+sudo apt install python3-opencv || { echo "Failed to install Python3, pip, or git"; exit 1; }
 
 # Install required Python packages
 echo "Installing Python dependencies..."
