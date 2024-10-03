@@ -1,5 +1,6 @@
 import time
 import math
+import threading  # Import threading module
 import websocket
 import cv2
 import cv2.aruco as aruco
@@ -12,7 +13,7 @@ import socket
 
 # Path for UNIX domain socket file
 SOCKET_PATH = "/tmp/attitudeForward.sock"
-config_file_path = "/home/cdc/MavLinkAttitudeListener/config.json" 
+config_file_path = "/home/cdc/MavLinkAttitudeListener/config.json"
 
 # Constants for ArUco detection
 PROCESSING_WIDTH = 320
@@ -42,8 +43,6 @@ def load_config():
         with open(config_file_path, 'r') as file:
             settings.update(json.load(file))
 #            print("Configuration reloaded:", settings)
-#    else:
-#       print("Configuration file not found, using default settings.")
 
 # Save settings to JSON
 def save_config():
@@ -162,8 +161,8 @@ def marker_detection():
         return
     else:
         print(f"Pre-loaded marker detected, ID: {ids[0][0]}")
-    
-    # Initialize video capture for live detection
+
+    # Continue with live video stream detection
     cap = cv2.VideoCapture(VIDEO_URL)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROCESSING_HEIGHT)
@@ -172,82 +171,72 @@ def marker_detection():
         print("Error: Could not open camera.")
         return
 
-    # Read a single frame for each iteration of main loop
-    ret, frame = cap.read()
-    if not ret or frame is None:
-        print("Error: Frame not retrieved.")
-        return
+    frn = 0
+    while True:
+        cap.grab()
+        ret, frame = cap.retrieve()
 
-    # Detect ArUco markers in the video frame
-    corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
+        if not ret or frame is None:
+            print("Error: Frame not retrieved.")
+            break
 
-    if ids is not None:
-        for i in range(len(ids)):
-            detected_marker_id = ids[i][0]
+        frn += 1
+        if frn % PROCESSING_INTERVAL != 0:
+            continue
 
-            # Get the corner coordinates
-            corner = corners[i].reshape((4, 2))
-            (topLeft, topRight, bottomRight, bottomLeft) = corner
+        # Detect ArUco markers in the video frame
+        corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
 
-            x1, y1 = topLeft
-            x2, y2 = bottomRight
-            center_x = int((x1 + x2) / 2)
-            center_y = int((y1 + y2) / 2)
+        if ids is not None:
+            for i in range(len(ids)):
+                detected_marker_id = ids[i][0]
 
-            image_center_x = frame.shape[1] // 2
-            image_center_y = frame.shape[0] // 2
+                # Get the corner coordinates
+                corner = corners[i].reshape((4, 2))
+                (topLeft, topRight, bottomRight, bottomLeft) = corner
 
-            # Calculate angular offsets
-            angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
-            angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+                x1, y1 = topLeft
+                x2, y2 = bottomRight
+                center_x = int((x1 + x2) / 2)
+                center_y = int((y1 + y2) / 2)
 
-            print(f"Marker Detected in video: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}")
+                image_center_x = frame.shape[1] // 2
+                image_center_y = frame.shape[0] // 2
 
-            # Send MAVLink and WebSocket messages
-            send_landing_target(angle_x, angle_y)
-            angle_X = math.degrees(angle_x)
-            angle_Y = math.degrees(angle_y)
-            send_ws_message(angle_X, angle_Y)
+                # Calculate angular offsets
+                angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
+                angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
 
-    # Release resources after detection
+                print(f"Marker Detected in video: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}")
+
+                # Send MAVLink and WebSocket messages
+                send_landing_target(angle_x, angle_y)
+                angle_X = math.degrees(angle_x)
+                angle_Y = math.degrees(angle_y)
+                send_ws_message(angle_X, angle_Y)
+
+    # Release resources
     cap.release()
 
+# Main loop using threading to run both attitude control and marker detection concurrently
 def main():
-    try:
-        print("Starting application...")  # Debugging start point
-        load_config()
+    load_config()
 
-        last_marker_time = time.time()
-        last_attitude_time = time.time()
-        marker_interval = 1.0  # Interval in seconds for marker detection
+    # Create a thread for attitude control
+    if settings["enable_attitude_control"]:
+        attitude_thread = threading.Thread(target=attitude_control)
+        attitude_thread.daemon = True  # Allow the program to exit even if this thread is running
+        attitude_thread.start()
 
-        print("Entering main loop...")  # Debugging to ensure loop starts
+    # Create a thread for marker detection
+    if settings["enable_marker_detection"]:
+        marker_thread = threading.Thread(target=marker_detection)
+        marker_thread.daemon = True  # Allow the program to exit even if this thread is running
+        marker_thread.start()
 
-        while True:
-            current_time = time.time()
+    # Keep the main program running while the threads do the work
+    while True:
+        time.sleep(1)
 
-            # Reload configuration to get the latest frequency from the socket (if it was changed)
-            load_config()
-            print("Configuration reloaded.")  # Debugging
-
-            # Dynamically update attitude interval based on the new frequency setting
-            attitude_interval = 1.0 / settings["attitude_frequency"]  # New interval for attitude control
-            print(f"Attitude interval set to: {attitude_interval} seconds")  # Debugging
-
-            # Run attitude control based on the defined interval
-            if settings["enable_attitude_control"] and (current_time - last_attitude_time >= attitude_interval):
-                print("Running attitude control...")  # Debugging
-                attitude_control()
-                last_attitude_time = current_time  # Update the last run time
-
-            # Run marker detection based on the defined interval
-            if settings["enable_marker_detection"] and (current_time - last_marker_time >= marker_interval):
-                print("Running marker detection...")  # Debugging
-                marker_detection()
-                last_marker_time = current_time  # Update the last run time
-
-            print("Loop iteration complete.")  # Debugging for loop iteration
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
+if __name__ == "__main__":
+    main()
