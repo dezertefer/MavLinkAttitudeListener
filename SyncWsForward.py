@@ -134,7 +134,7 @@ def marker_detection():
         print("Error: ArUco marker image not found.")
         return
 
-    # Load ArUco dictionary and parameters                                      
+    # Load ArUco dictionary and parameters
     aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
     parameters = aruco.DetectorParameters_create()
 
@@ -163,7 +163,7 @@ def marker_detection():
     else:
         print(f"Pre-loaded marker detected, ID: {ids[0][0]}")
     
-    # Continue with live video stream detection
+    # Initialize video capture for live detection
     cap = cv2.VideoCapture(VIDEO_URL)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROCESSING_HEIGHT)
@@ -172,61 +172,71 @@ def marker_detection():
         print("Error: Could not open camera.")
         return
 
-    frn = 0
-    while True:
-        cap.grab()
-        ret, frame = cap.retrieve()
+    # Read a single frame for each iteration of main loop
+    ret, frame = cap.read()
+    if not ret or frame is None:
+        print("Error: Frame not retrieved.")
+        return
 
-        if not ret or frame is None:
-            print("Error: Frame not retrieved.")
-            break
+    # Detect ArUco markers in the video frame
+    corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
 
-        frn += 1
-        if frn % PROCESSING_INTERVAL != 0:
-            continue
+    if ids is not None:
+        for i in range(len(ids)):
+            detected_marker_id = ids[i][0]
 
-        # Detect ArUco markers in the video frame
-        corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
+            # Get the corner coordinates
+            corner = corners[i].reshape((4, 2))
+            (topLeft, topRight, bottomRight, bottomLeft) = corner
 
-        if ids is not None:
-            for i in range(len(ids)):
-                detected_marker_id = ids[i][0]
+            x1, y1 = topLeft
+            x2, y2 = bottomRight
+            center_x = int((x1 + x2) / 2)
+            center_y = int((y1 + y2) / 2)
 
-                # Get the corner coordinates
-                corner = corners[i].reshape((4, 2))
-                (topLeft, topRight, bottomRight, bottomLeft) = corner
+            image_center_x = frame.shape[1] // 2
+            image_center_y = frame.shape[0] // 2
 
-                x1, y1 = topLeft
-                x2, y2 = bottomRight
-                center_x = int((x1 + x2) / 2)
-                center_y = int((y1 + y2) / 2)
+            # Calculate angular offsets
+            angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
+            angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
 
-                image_center_x = frame.shape[1] // 2
-                image_center_y = frame.shape[0] // 2
+            print(f"Marker Detected in video: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}")
 
-                # Calculate angular offsets
-                angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
-                angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+            # Send MAVLink and WebSocket messages
+            send_landing_target(angle_x, angle_y)
+            angle_X = math.degrees(angle_x)
+            angle_Y = math.degrees(angle_y)
+            send_ws_message(angle_X, angle_Y)
 
-                print(f"Marker Detected in video: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}")
-
-                # Send MAVLink and WebSocket messages
-                send_landing_target(angle_x, angle_y)
-                angle_X = math.degrees(angle_x)
-                angle_Y = math.degrees(angle_y)
-                send_ws_message(angle_X, angle_Y)
-
-    # Release resources
+    # Release resources after detection
     cap.release()
 
 # Main loop without threading
 def main():
-    load_config()
-    if settings["enable_attitude_control"]:
-        attitude_control()
+load_config()
 
-    if settings["enable_marker_detection"]:
-        marker_detection()
+    last_marker_time = time.time()
+    last_attitude_time = time.time()
+    marker_interval = 1.0  # Interval in seconds for marker detection
 
-if __name__ == "__main__":
-    main()
+    while True:
+        current_time = time.time()
+
+        # Reload configuration to get the latest frequency from the socket (if it was changed)
+        load_config()
+
+        # Dynamically update attitude interval based on the new frequency setting
+        attitude_interval = 1.0 / settings["attitude_frequency"]  # New interval for attitude control
+
+        # Run attitude control based on the defined interval
+        if settings["enable_attitude_control"] and (current_time - last_attitude_time >= attitude_interval):
+            attitude_control()
+            last_attitude_time = current_time  # Update the last run time
+
+        # Run marker detection based on the defined interval
+        if settings["enable_marker_detection"] and (current_time - last_marker_time >= marker_interval):
+            marker_detection()
+            last_marker_time = current_time  # Update the last run time
+
+        # Don't use sleep; let the loop run continuously without pause
