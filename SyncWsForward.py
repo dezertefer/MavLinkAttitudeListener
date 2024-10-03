@@ -89,16 +89,22 @@ def send_landing_target(angle_x, angle_y, distance=0.0):
 def send_ws_message(*angles):
     """Send angular offsets over WebSocket"""
     if len(angles) == 3:
+        # If yaw, pitch, roll are provided
         yaw, pitch, roll = angles
-        message = f"Yaw: {yaw:.2f}, Pitch: {pitch:.2f}, Roll: {roll:.2f}"
+        timestamp = int(time.time() * 1000)  # Generate a timestamp in milliseconds
+        data = {
+            "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
+            "timestamp": timestamp,
+            "accuracy": 3
+        }
+        message = json.dumps(data)  # Convert the dictionary to a JSON string
+        ws.send(message)
+        print(f"Sent over WebSocket: {message}")
     elif len(angles) == 2:
-        angle_x, angle_y = angles
-        message = f"Xangle: {angle_x:.2f}, Yangle: {angle_y:.2f}"
+        # If only angle_x and angle_y are provided, do nothing
+        pass
     else:
         raise ValueError("Invalid number of arguments for send_ws_message()")
-    
-    ws.send(message)
-    print(f"Sent over WebSocket: {message}")
 
 def request_message_interval(message_id: int, frequency_hz: float):
     """Request MAVLink message at a desired frequency."""
