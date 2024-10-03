@@ -35,6 +35,20 @@ settings = {
     "enable_marker_detection": True
 }
 
+def create_socket():
+    if os.path.exists(SOCKET_PATH):
+        print("Removing existing socket")
+        os.remove(SOCKET_PATH)  # Remove the socket if it already exists
+    try:
+        print("Creating socket...")
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(SOCKET_PATH)
+        server.listen(1)  # Listen for incoming connections
+        print(f"Socket created and listening at {SOCKET_PATH}")
+        return server
+    except socket.error as e:
+        print(f"Socket creation failed: {e}")
+        return None
 # Global control flags for the threads
 attitude_running = False
 marker_running = False
@@ -51,6 +65,7 @@ def save_config():
         json.dump(settings, file, indent=4)
     print("Configuration saved:", settings)
 
+load_config()
 # MAVLink connection
 master = mavutil.mavlink_connection("/dev/serial0", baud=921600)
 master.wait_heartbeat()
@@ -82,6 +97,11 @@ def send_ws_message(*angles):
         message = json.dumps(data)
         ws.send(message)
         print(f"Sent over WebSocket: {message}")
+    elif len(angles) == 2:
+        # If only angle_x and angle_y are provided, do nothing
+        pass
+    else:
+        raise ValueError("Invalid number of arguments for send_ws_message()")
 
 def request_message_interval(message_id: int, frequency_hz: float):
     print(f"Requesting message {message_id} at {frequency_hz} Hz")
@@ -133,6 +153,26 @@ def marker_detection():
     aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
     parameters = aruco.DetectorParameters_create()
 
+    print('Loading the pre-defined ArUco marker...')
+    # Create a margin around the pre-defined marker
+    margin_size = 20
+    color = [255, 255, 255]  # White color for margin
+    # Get original dimensions
+    height, width, channels = aruco_marker_image.shape
+    # Create a new image with margin
+    new_height = height + 2 * margin_size
+    new_width = width + 2 * margin_size
+    image_with_margin = np.full((new_height, new_width, channels), color, dtype=np.uint8)
+    # Place the original marker in the center of the new image
+    image_with_margin[margin_size:margin_size + height, margin_size:margin_size + width] = aruco_marker_image
+    corners, ids, rejected = aruco.detectMarkers(image_with_margin, aruco_dict, parameters=parameters)
+    # Check if a valid marker was found in the pre-loaded image
+    if ids is None:
+        print('Error: Invalid ArUco marker in the pre-loaded image.')
+        return
+    else:
+        print(f"Pre-loaded marker detected, ID: {ids[0][0]}")
+    # Continue with live video stream detection
     cap = cv2.VideoCapture(VIDEO_URL)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROCESSING_HEIGHT)
@@ -175,6 +215,10 @@ def marker_detection():
 
                 print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}")
                 send_landing_target(angle_x, angle_y)
+                
+                angle_X = math.degrees(angle_x)
+                angle_Y = math.degrees(angle_y)
+                send_ws_message(angle_X, angle_Y)
 
     cap.release()
 
@@ -182,6 +226,10 @@ def marker_detection():
 def main():
     load_config()
 
+    server_socket = create_socket()
+    if server_socket is None:
+        return  # Exit if the socket creation failed
+    
     global attitude_running, marker_running
 
     if settings["enable_attitude_control"]:
