@@ -52,6 +52,15 @@ def save_config():
         json.dump(settings, file, indent=4)
     print("Configuration saved:", settings)
 
+def request_message_interval(message_id: int, frequency_hz: float):
+    """Request MAVLink message at a desired frequency."""
+    print(f"Requesting message {message_id} at {frequency_hz} Hz")
+    master.mav.command_long_send(
+        master.target_system, master.target_component,
+        mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
+        message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
+    )
+
 # Load settings at the start
 load_config()
 
