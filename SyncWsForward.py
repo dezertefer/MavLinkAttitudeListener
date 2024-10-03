@@ -35,6 +35,13 @@ settings = {
     "enable_attitude_control": True,
     "enable_marker_detection": True
 }
+def create_socket():
+    if os.path.exists(SOCKET_PATH):
+        os.remove(SOCKET_PATH)  # Remove the socket if it already exists
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(SOCKET_PATH)
+    server.listen(1)  # Listen for incoming connections
+    return server
 
 # Load settings from JSON
 def load_config():
@@ -221,6 +228,11 @@ def marker_detection():
 # Main loop using threading to run both attitude control and marker detection concurrently
 def main():
     load_config()
+    
+    # Ensure the socket is created
+    server_socket = create_socket()
+    if server_socket is None:
+        return  # Exit if the socket creation failed
 
     # Create a thread for attitude control
     if settings["enable_attitude_control"]:
