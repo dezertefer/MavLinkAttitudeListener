@@ -213,30 +213,38 @@ def marker_detection():
     cap.release()
 
 def main():
+    print("Starting application...")  # Debugging start point
     load_config()
 
     last_marker_time = time.time()
     last_attitude_time = time.time()
     marker_interval = 1.0  # Interval in seconds for marker detection
 
+    print("Entering main loop...")  # Debugging to ensure loop starts
+
     while True:
         current_time = time.time()
 
         # Reload configuration to get the latest frequency from the socket (if it was changed)
         load_config()
+        print("Configuration reloaded.")  # Debugging
 
         # Dynamically update attitude interval based on the new frequency setting
         attitude_interval = 1.0 / settings["attitude_frequency"]  # New interval for attitude control
+        print(f"Attitude interval set to: {attitude_interval} seconds")  # Debugging
 
         # Run attitude control based on the defined interval
         if settings["enable_attitude_control"] and (current_time - last_attitude_time >= attitude_interval):
+            print("Running attitude control...")  # Debugging
             attitude_control()
             last_attitude_time = current_time  # Update the last run time
 
         # Run marker detection based on the defined interval
         if settings["enable_marker_detection"] and (current_time - last_marker_time >= marker_interval):
+            print("Running marker detection...")  # Debugging
             marker_detection()
             last_marker_time = current_time  # Update the last run time
 
         # The loop runs continuously without sleep, but will not block the system
+        print("Loop iteration complete.")  # Debugging for loop iteration
 
