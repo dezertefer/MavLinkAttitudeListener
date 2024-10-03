@@ -40,9 +40,9 @@ def load_config():
     if os.path.exists(config_file_path):
         with open(config_file_path, 'r') as file:
             settings.update(json.load(file))
-            print("Configuration reloaded:", settings)
-    else:
-        print("Configuration file not found, using default settings.")
+#            print("Configuration reloaded:", settings)
+#    else:
+#       print("Configuration file not found, using default settings.")
 
 # Save settings to JSON
 def save_config():
