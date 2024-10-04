@@ -86,7 +86,7 @@ marker_ws.connect('ws://18.234.27.121:8085')
 def send_landing_target(angle_x, angle_y, distance=0.0):
     master.mav.landing_target_send(
         int(time.time() * 1000000),
-        0, mavutil.mavlink.MAV_FRAME_BODY_NED, angle_x, angle_y, distance, 0.0, 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0], 0, 0)
+        0, mavutil.mavlink.MAV_FRAME_BODY_NED, angle_x, angle_y, distance_rangefinder, 0.0, 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0], 0, 0)
 
 # Function to send angular offsets over WebSocket
 def send_ws_message(*angles):
