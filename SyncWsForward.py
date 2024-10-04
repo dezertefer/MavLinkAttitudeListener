@@ -285,8 +285,8 @@ def main():
     global attitude_running, marker_running
 
     # Start the rangefinder listener thread
-    rangefinder_thread = threading.Thread(target=rangefinder_listener, daemon=True)
-    rangefinder_thread.start()
+    #rangefinder_thread = threading.Thread(target=rangefinder_listener, daemon=True)
+    #rangefinder_thread.start()
     
     # Start attitude and marker detection threads
     if settings["enable_attitude_control"]:
