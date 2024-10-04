@@ -115,19 +115,20 @@ def request_message_interval(message_id: int, frequency_hz: float):
         message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
     )
     
-distance = 0.0  # Default distance value
+distance_rangefinder = 0.0  # Default distance value
 
-def rangefinder_listener():
-    global distance
-    while True:
-        message = master.recv_match(type='DISTANCE_SENSOR', blocking=True)
-        if message:
-            distance = message.current_distance / 100.0  # Convert to meters if needed
-# Attitude Control Logic
+#def rangefinder_listener():
+ #   global distance
+#    while True:
+ #       message = master.recv_match(type='DISTANCE_SENSOR', blocking=True)
+ #       if message:
+ #           distance = message.current_distance / 100.0  # Convert to meters if needed
+## Attitude Control Logic
 def attitude_control():
-    global attitude_running
+    global attitude_running, distance_rangefinder
     request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, settings['attitude_frequency'])
-
+    request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_DISTANCE_SENSOR, 10)
+    
     while attitude_running:
         try:
             load_config()
@@ -148,15 +149,19 @@ def attitude_control():
                     yaw = settings["fixed_yaw_angle"]
                 if settings["swap_pitch_roll"]:
                     roll, pitch = pitch, roll
-
                 send_ws_message(yaw, pitch, roll)
+            elif message and message.get_type() == 'DISTANCE_SENSOR':
+                distance_rangefinder = message.current_distance / 100.0  # Distance in meters
+                print(f"Rangefinder Distance: {rangefinder_distance} meters")
+                
+                
         except Exception as e:
             print(f"Error in attitude control: {e}")
             break
 
 # Marker Detection Logic
 def marker_detection():
-    global marker_running
+    global marker_running, distance_rangefinder
     aruco_marker_image = cv2.imread('marker.jpg')
     if aruco_marker_image is None:
         print("Error: ArUco marker image not found.")
@@ -166,7 +171,24 @@ def marker_detection():
     parameters = aruco.DetectorParameters_create()
 
     print('Loading the pre-defined ArUco marker...')
-
+        # Create a margin around the pre-defined marker
+    margin_size = 20
+    color = [255, 255, 255]  # White color for margin
+    # Get original dimensions
+    height, width, channels = aruco_marker_image.shape
+    # Create a new image with margin
+    new_height = height + 2 * margin_size
+    new_width = width + 2 * margin_size
+    image_with_margin = np.full((new_height, new_width, channels), color, dtype=np.uint8)
+    # Place the original marker in the center of the new image
+    image_with_margin[margin_size:margin_size + height, margin_size:margin_size + width] = aruco_marker_image
+    corners, ids, rejected = aruco.detectMarkers(image_with_margin, aruco_dict, parameters=parameters)
+    # Check if a valid marker was found in the pre-loaded image
+    if ids is None:
+        print('Error: Invalid ArUco marker in the pre-loaded image.')
+        return
+    else:
+        print(f"Pre-loaded marker detected, ID: {ids[0][0]}")
     # Continue with live video stream detection
     cap = cv2.VideoCapture(VIDEO_URL)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
@@ -215,7 +237,7 @@ def marker_detection():
                     "markerId": detected_marker_id,
                     "angle_x": angle_x,
                     "angle_y": angle_y,
-                    "distance": distance  # This value will be updated by the rangefinder thread
+                    "distance": distance_rangefinder  # This value will be updated by the rangefinder thread
                 }
                 marker_ws.send(json.dumps(marker_data))
                 print(f"Sent over marker WebSocket: {marker_data}")
