@@ -6,7 +6,7 @@
     "reverse_yaw": false,
     "fixed_yaw_angle": null,
     "ws_url": "ws://18.234.27.121:8085",
-    "marker_ws_url": "ws://18.234.27.121:8086",
+    "marker_ws_url": "ws://18.234.27.121:8085",
     "enable_attitude_control": true,
     "enable_marker_detection": true
 }
