@@ -149,6 +149,7 @@ def attitude_control():
                     yaw = settings["fixed_yaw_angle"]
                 if settings["swap_pitch_roll"]:
                     roll, pitch = pitch, roll
+                    
                 send_ws_message(yaw, pitch, roll)
             elif message and message.get_type() == 'DISTANCE_SENSOR':
                 distance_rangefinder = message.current_distance / 100.0  # Distance in meters
@@ -230,7 +231,7 @@ def marker_detection():
                 angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
                 angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
 
-                print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}, Distance={distance}")
+                print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}, Distance={distance_rangefinder}")
 
                 # Send marker data over the second WebSocket
                 marker_data = {
