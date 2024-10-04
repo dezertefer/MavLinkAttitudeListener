@@ -22,6 +22,7 @@ FOV_X = 4.18879  # 240 degrees in radians
 FOV_Y = 4.18879  # 240 degrees in radians
 PROCESSING_INTERVAL = 1
 
+
 # Default settings
 settings = {
     "attitude_frequency": 10,
@@ -78,6 +79,9 @@ if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
 ws = websocket.WebSocket()
 ws.connect(settings["ws_url"])
 
+marker_ws = websocket.WebSocket()
+marker_ws.connect('ws://18.234.27.121:8085')
+
 # Function to send landing target message via MAVLink
 def send_landing_target(angle_x, angle_y, distance=0.0):
     master.mav.landing_target_send(
@@ -110,7 +114,15 @@ def request_message_interval(message_id: int, frequency_hz: float):
         mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
         message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
     )
+    
+distance = 0.0  # Default distance value
 
+def rangefinder_listener():
+    global distance
+    while True:
+        message = master.recv_match(type='DISTANCE_SENSOR', blocking=True)
+        if message:
+            distance = message.current_distance / 100.0  # Convert to meters if needed
 # Attitude Control Logic
 def attitude_control():
     global attitude_running
@@ -154,24 +166,7 @@ def marker_detection():
     parameters = aruco.DetectorParameters_create()
 
     print('Loading the pre-defined ArUco marker...')
-    # Create a margin around the pre-defined marker
-    margin_size = 20
-    color = [255, 255, 255]  # White color for margin
-    # Get original dimensions
-    height, width, channels = aruco_marker_image.shape
-    # Create a new image with margin
-    new_height = height + 2 * margin_size
-    new_width = width + 2 * margin_size
-    image_with_margin = np.full((new_height, new_width, channels), color, dtype=np.uint8)
-    # Place the original marker in the center of the new image
-    image_with_margin[margin_size:margin_size + height, margin_size:margin_size + width] = aruco_marker_image
-    corners, ids, rejected = aruco.detectMarkers(image_with_margin, aruco_dict, parameters=parameters)
-    # Check if a valid marker was found in the pre-loaded image
-    if ids is None:
-        print('Error: Invalid ArUco marker in the pre-loaded image.')
-        return
-    else:
-        print(f"Pre-loaded marker detected, ID: {ids[0][0]}")
+
     # Continue with live video stream detection
     cap = cv2.VideoCapture(VIDEO_URL)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
@@ -213,14 +208,20 @@ def marker_detection():
                 angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
                 angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
 
-                print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}")
-                send_landing_target(angle_x, angle_y)
-                
-                angle_X = math.degrees(angle_x)
-                angle_Y = math.degrees(angle_y)
-                send_ws_message(angle_X, angle_Y)
+                print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}, Distance={distance}")
+
+                # Send marker data over the second WebSocket
+                marker_data = {
+                    "markerId": detected_marker_id,
+                    "angle_x": angle_x,
+                    "angle_y": angle_y,
+                    "distance": distance  # This value will be updated by the rangefinder thread
+                }
+                marker_ws.send(json.dumps(marker_data))
+                print(f"Sent over marker WebSocket: {marker_data}")
 
     cap.release()
+
 
 def handle_command(command):
     global attitude_running, marker_running
@@ -230,11 +231,11 @@ def handle_command(command):
         save_config()  # Save updated setting to file
         print("Attitude control stopped.")
     elif command == "start_attitude":
-        if not attitude_running:
+        if not attitude_running:  # Only start if not already running
             attitude_running = True
             settings["enable_attitude_control"] = True  # Update setting
             save_config()  # Save updated setting to file
-            threading.Thread(target=attitude_control, daemon=True).start()
+            threading.Thread(target=attitude_control, daemon=True).start()  # Always start a new thread
             print("Attitude control started.")
     elif command == "stop_marker":
         marker_running = False
@@ -242,11 +243,11 @@ def handle_command(command):
         save_config()  # Save updated setting to file
         print("Marker detection stopped.")
     elif command == "start_marker":
-        if not marker_running:
+        if not marker_running:  # Only start if not already running
             marker_running = True
             settings["enable_marker_detection"] = True  # Update setting
             save_config()  # Save updated setting to file
-            threading.Thread(target=marker_detection, daemon=True).start()
+            threading.Thread(target=marker_detection, daemon=True).start()  # Always start a new thread
             print("Marker detection started.")
     else:
         print(f"Unknown command: {command}")
@@ -261,6 +262,10 @@ def main():
     
     global attitude_running, marker_running
 
+    # Start the rangefinder listener thread
+    rangefinder_thread = threading.Thread(target=rangefinder_listener, daemon=True)
+    rangefinder_thread.start()
+    
     # Start attitude and marker detection threads
     if settings["enable_attitude_control"]:
         attitude_running = True
