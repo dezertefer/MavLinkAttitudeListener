@@ -80,7 +80,7 @@ ws = websocket.WebSocket()
 ws.connect(settings["ws_url"])
 
 marker_ws = websocket.WebSocket()
-marker_ws.connect('ws://18.234.27.121:8085')
+marker_ws.connect(settings["marker_ws_url"])
 
 # Function to send landing target message via MAVLink
 def send_landing_target(angle_x, angle_y, distance=0.0):
