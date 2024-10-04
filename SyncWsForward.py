@@ -24,6 +24,7 @@ PROCESSING_INTERVAL = 1
 
 
 # Default settings
+# Default settings
 settings = {
     "attitude_frequency": 10,
     "reverse_roll": False,
@@ -31,10 +32,12 @@ settings = {
     "swap_pitch_roll": False,
     "reverse_yaw": False,
     "fixed_yaw_angle": None,
-    "ws_url": "ws://18.234.27.121:8085",
+    "ws_url": "ws://18.234.27.121:8085",  # WebSocket URL for attitude data
+    "marker_ws_url": "ws://18.234.27.121:8086",  # WebSocket URL for marker detection data
     "enable_attitude_control": True,
     "enable_marker_detection": True
 }
+
 
 def create_socket():
     if os.path.exists(SOCKET_PATH):
