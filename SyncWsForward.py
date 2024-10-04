@@ -152,7 +152,7 @@ def attitude_control():
                 send_ws_message(yaw, pitch, roll)
             elif message and message.get_type() == 'DISTANCE_SENSOR':
                 distance_rangefinder = message.current_distance / 100.0  # Distance in meters
-                print(f"Rangefinder Distance: {rangefinder_distance} meters")
+                print(f"Rangefinder Distance: {distance_rangefinder} meters")
                 
                 
         except Exception as e:
