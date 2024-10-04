@@ -20,6 +20,7 @@ This project allows you to listen to MAVLink messages, forward `ATTITUDE` messag
    cd MavLinkAttitudeListener
    chmod +x install.sh
    chmod +x attitudeForward.py
+   python3 generate_aruco_marker.py --id 500
    ./install.sh
    ```
 
