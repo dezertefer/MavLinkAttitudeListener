@@ -46,6 +46,12 @@ if __name__ == "__main__":
             sys.exit(1)
         new_url = sys.argv[2]
         save_config("ws_url", new_url)
+    elif command == "set_marker_ws_url":
+        if len(sys.argv) < 3:
+            print("Usage: attitudeForward set_marker_ws_url <new_url>")
+            sys.exit(1)
+        new_url = sys.argv[2]
+        save_config("marker_ws_url", new_url)
     elif command == "reverse_pitch_on":
         save_config("reverse_pitch", True)
     elif command == "reverse_pitch_off":
