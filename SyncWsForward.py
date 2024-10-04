@@ -238,7 +238,7 @@ def marker_detection():
                     "markerId": detected_marker_id,  # Use standard int
                     "angle_x": round(float(angle_x), 3),  # Convert NumPy float to Python float
                     "angle_y": round(float(angle_y), 3),  # Convert NumPy float to Python float
-                    "distance": round(float(distance_rangefinder), 3)  # Ensure distance is a standard float
+                    "distance": round(float(0.0), 3)  # Ensure distance is a standard float
                 }
                 marker_ws.send(json.dumps(marker_data))
                 print(f"Sent over marker WebSocket: {marker_data}")
