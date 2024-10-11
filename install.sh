@@ -23,7 +23,8 @@ SERVICE_FILE=/etc/systemd/system/attitudeForward.service
 sudo bash -c "cat > $SERVICE_FILE" << EOL
 [Unit]
 Description=MavLink Attitude Forward Service
-After=network.target
+After=mavlink-router.service
+Wants=mavlink-router.service
 
 [Service]
 WorkingDirectory=$(pwd)
