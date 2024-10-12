@@ -32,8 +32,8 @@ settings = {
     "swap_pitch_roll": False,
     "reverse_yaw": False,
     "fixed_yaw_angle": None,
-    "ws_url": "ws://18.234.27.121:8085",  # WebSocket URL for attitude data
-    "marker_ws_url": "ws://18.234.27.121:8085",  # WebSocket URL for marker detection data
+    "ws_url": "ws://3.91.74.146:8485",  # WebSocket URL for attitude data
+    "marker_ws_url": "ws://3.91.74.146:8486",  # WebSocket URL for marker detection data
     "enable_attitude_control": True,
     "enable_marker_detection": True
 }
