@@ -308,7 +308,7 @@ def main():
         command = conn.recv(1024).decode().strip()
         handle_command(command)
         conn.close()
-        time.sleep(1)
+        time.sleep(0.01)
 
 if __name__ == "__main__":
     main()
