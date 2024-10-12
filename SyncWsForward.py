@@ -71,7 +71,7 @@ def save_config():
 
 load_config()
 # MAVLink connection
-master = mavutil.mavlink_connection("/dev/serial0", baud=921600)
+master = mavutil.mavlink_connection('udpin:localhost:14550')
 master.wait_heartbeat()
 
 # Flush serial buffer if using serial connection
