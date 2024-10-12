@@ -163,6 +163,8 @@ def attitude_control():
         except Exception as e:
             print(f"Error in attitude control: {e}")
             break
+            
+        time.sleep(0.01)
 
 # Marker Detection Logic
 def marker_detection():
@@ -247,6 +249,8 @@ def marker_detection():
                 send_landing_target(angle_x,angle_y)
                 marker_ws.send(json.dumps(marker_data))
                 print(f"Sent over marker WebSocket: {marker_data}")
+        
+        time.sleep(0.01)
 
     cap.release()
 
