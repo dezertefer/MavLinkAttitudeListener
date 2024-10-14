@@ -132,7 +132,7 @@ def attitude_control():
     global attitude_running, distance_rangefinder
     request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, settings['attitude_frequency'])
     request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_DISTANCE_SENSOR, settings['attitude_frequency'])
-    
+    print(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE)
     while attitude_running:
         try:
             load_config()
