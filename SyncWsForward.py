@@ -164,7 +164,7 @@ def attitude_control():
             print(f"Error in attitude control: {e}")
             break
             
-        time.sleep(0.01)
+        #time.sleep(0.01)
 
 # Marker Detection Logic
 def marker_detection():
@@ -250,7 +250,7 @@ def marker_detection():
                 marker_ws.send(json.dumps(marker_data))
                 print(f"Sent over marker WebSocket: {marker_data}")
         
-        time.sleep(0.01)
+        #time.sleep(0.01)
 
     cap.release()
 
@@ -312,7 +312,7 @@ def main():
         command = conn.recv(1024).decode().strip()
         handle_command(command)
         conn.close()
-        time.sleep(0.01)
+        time.sleep(0.001)
 
 if __name__ == "__main__":
     main()
