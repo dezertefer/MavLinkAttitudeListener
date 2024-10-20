@@ -71,8 +71,8 @@ def save_config():
 
 load_config()
 # MAVLink connection
-master = mavutil.mavlink_connection('udpin:localhost:14550')
-print("TRYING TO CONNECT TO UDP PORT")
+master = mavutil.mavlink_connection('tcp:localhost:5760')
+print("TRYING TO CONNECT TO TCP PORT")
 master.wait_heartbeat()
 
 # Flush serial buffer if using serial connection
