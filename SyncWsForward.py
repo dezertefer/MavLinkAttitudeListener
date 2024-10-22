@@ -71,7 +71,7 @@ def save_config():
 
 load_config()
 # MAVLink connection
-master = mavutil.mavlink_connection('tcp:localhost:5760')
+master = mavutil.mavlink_connection('udpin:localhost:14550')
 print("TRYING TO CONNECT TO TCP PORT")
 master.wait_heartbeat()
 
