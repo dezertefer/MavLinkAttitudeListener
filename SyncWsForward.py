@@ -72,6 +72,7 @@ load_config()
 master = mavutil.mavlink_connection('udpin:localhost:14550')
 print("TRYING TO CONNECT TO TCP PORT")
 master.wait_heartbeat()
+print("Connected to MAVLink")
 
 def send_udp_message(data):
     message_json = json.dumps(data)
@@ -123,16 +124,17 @@ def attitude_control():
 # Marker Detection Logic
 def marker_detection():
     global marker_running
+    print('Loading the pre-defined ArUco marker...')
     aruco_marker_image = cv2.imread('marker.jpg')
     if aruco_marker_image is None:
         print("Error: ArUco marker image not found.")
         return
 
+    print("Pre-defined ArUco marker loaded successfully.")
+
     aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
     parameters = aruco.DetectorParameters_create()
 
-    print('Loading the pre-defined ArUco marker...')
-    
     cap = cv2.VideoCapture(VIDEO_URL)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROCESSING_HEIGHT)
@@ -226,10 +228,12 @@ def main():
     if settings.get("enable_attitude_control", False):
         attitude_running = True
         threading.Thread(target=attitude_control, daemon=True).start()
+        print("Attitude control thread initiated.")
 
     if settings.get("enable_marker_detection", False):
         marker_running = True
         threading.Thread(target=marker_detection, daemon=True).start()
+        print("Marker detection thread initiated.")
 
     while True:
         conn, _ = server_socket.accept()
