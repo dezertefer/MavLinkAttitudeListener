@@ -14,6 +14,9 @@ import socket
 SOCKET_PATH = "/tmp/attitudeForward.sock"
 config_file_path = "/home/cdc/MavLinkAttitudeListener/config.json"
 
+CLIENT_IP = "127.0.0.1"  # Client address
+CLIENT_PORT = 13370    # Client port to send data to
+
 # Constants for ArUco detection
 PROCESSING_WIDTH = 320
 PROCESSING_HEIGHT = 320
@@ -22,7 +25,7 @@ FOV_X = 4.18879  # 240 degrees in radians
 FOV_Y = 4.18879  # 240 degrees in radians
 PROCESSING_INTERVAL = 1
 
-
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # Default settings
 # Default settings
 settings = {
@@ -87,6 +90,11 @@ marker_ws = websocket.WebSocket()
 marker_ws.connect(settings["marker_ws_url"])
 
 # Function to send landing target message via MAVLink
+def send_udp_message(data):
+    message_json = json.dumps(data)
+    sock.sendto(message_json.encode(), (UDP_IP, UDP_PORT))
+    print(f"Sent message to {UDP_IP}:{UDP_PORT}: {message_json}")
+
 def send_landing_target(angle_x, angle_y, distance=0.0):
     master.mav.landing_target_send(
         int(time.time() * 1000000),
@@ -154,7 +162,8 @@ def attitude_control():
                 if settings["swap_pitch_roll"]:
                     roll, pitch = pitch, roll
                     
-                send_ws_message(yaw, pitch, roll)
+                #send_ws_message(yaw, pitch, roll)
+                send_udp_message({"type": "attitude", "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)], "timestamp": int(time.time() * 1000), "accuracy": 3})
             elif message and message.get_type() == 'DISTANCE_SENSOR':
                 distance_rangefinder = message.current_distance / 100.0  # Distance in meters
                 print(f"Rangefinder Distance: {distance_rangefinder} meters")
@@ -247,8 +256,17 @@ def marker_detection():
                     "distance": round(float(distance_rangefinder), 3)  # Ensure distance is a standard float
                 }
                 send_landing_target(angle_x,angle_y)
-                marker_ws.send(json.dumps(marker_data))
+                #marker_ws.send(json.dumps(marker_data))
                 print(f"Sent over marker WebSocket: {marker_data}")
+                                    # Send marker data over UDP
+                marker_data = {
+                    "type": "marker",
+                    "markerId": detected_marker_id,
+                    "angle_x": round(float(angle_x), 3),
+                    "angle_y": round(float(angle_y), 3),
+                    "timestamp": int(time.time() * 1000)
+                }
+                send_udp_message(marker_data)
         
         #time.sleep(0.01)
 
