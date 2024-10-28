@@ -227,9 +227,9 @@ def main():
         attitude_running = True
         threading.Thread(target=attitude_control, daemon=True).start()
 
-    if settings.get("enable_marker_detection", False):
-        marker_running = True
-        threading.Thread(target=marker_detection, daemon=True).start()
+   # if settings.get("enable_marker_detection", False):
+      #  marker_running = True
+      #  threading.Thread(target=marker_detection, daemon=True).start()
 
     while True:
         conn, _ = server_socket.accept()
