@@ -208,4 +208,35 @@ def handle_command(command):
             marker_running = True
             settings["enable_marker_detection"] = True
             save_config()
-            print("Starting marker detection thread.
+            print("Starting marker detection thread...")
+            threading.Thread(target=marker_detection, daemon=True).start()
+            print("Marker detection started.")
+    else:
+        print(f"Unknown command: {command}")
+
+# Main function
+def main():
+    load_config()
+
+    server_socket = create_socket()
+    if server_socket is None:
+        return  # Exit if the socket creation failed
+
+    # Start attitude and marker detection if enabled
+    if settings.get("enable_attitude_control", False):
+        attitude_running = True
+        threading.Thread(target=attitude_control, daemon=True).start()
+
+    if settings.get("enable_marker_detection", False):
+        marker_running = True
+        threading.Thread(target=marker_detection, daemon=True).start()
+
+    while True:
+        conn, _ = server_socket.accept()
+        command = conn.recv(1024).decode().strip()
+        handle_command(command)
+        conn.close()
+        time.sleep(0.001)
+
+if __name__ == "__main__":
+    main()
