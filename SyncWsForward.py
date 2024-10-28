@@ -19,7 +19,6 @@ PROCESSING_HEIGHT = 320
 VIDEO_URL = 'rtsp://127.0.0.1:8554/cam'
 FOV_X = 4.18879  # 240 degrees in radians
 FOV_Y = 4.18879  # 240 degrees in radians
-PROCESSING_INTERVAL = 1
 
 # Default settings
 settings = {
@@ -29,6 +28,7 @@ settings = {
     "swap_pitch_roll": False,
     "reverse_yaw": False,
     "fixed_yaw_angle": None,
+    "enable_marker_detection": True
 }
 
 # Create a UDP socket
@@ -53,6 +53,7 @@ def create_socket():
 
 # Global control flags for the threads
 attitude_running = False
+marker_running = False
 
 def load_config():
     global settings
@@ -72,21 +73,25 @@ master = mavutil.mavlink_connection('udpin:localhost:14550')
 print("TRYING TO CONNECT TO TCP PORT")
 master.wait_heartbeat()
 
-# Function to send attitude messages over UDP
-def send_udp_message(yaw, pitch, roll):
-    message = {
-        "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
-        "timestamp": int(time.time() * 1000),
-        "accuracy": 3
-    }
-    message_json = json.dumps(message)
+def send_udp_message(data):
+    message_json = json.dumps(data)
     sock.sendto(message_json.encode(), (UDP_IP, UDP_PORT))
     print(f"Sent message to {UDP_IP}:{UDP_PORT}: {message_json}")
+
+def request_message_interval(message_id: int, frequency_hz: float):
+    print(f"Requesting message {message_id} at {frequency_hz} Hz")
+    master.mav.command_long_send(
+        master.target_system, master.target_component,
+        mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
+        message_id, 1e6 / frequency_hz, 0, 0, 0, 0, 0
+    )
 
 # Attitude Control Logic
 def attitude_control():
     global attitude_running
     print("Starting attitude control...")
+    request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, settings['attitude_frequency'])
+    
     while attitude_running:
         try:
             message = master.recv_match(blocking=True)
@@ -106,27 +111,106 @@ def attitude_control():
                 if settings["swap_pitch_roll"]:
                     roll, pitch = pitch, roll
                 
-                send_udp_message(yaw, pitch, roll)
-            time.sleep(0.1)
+                send_udp_message({"type": "attitude", "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)], "timestamp": int(time.time() * 1000), "accuracy": 3})
+
+            time.sleep(0.1)  # Adjust the sleep time as needed
 
         except Exception as e:
             print(f"Error in attitude control: {e}")
             break
+    print("Attitude control stopped.")
+
+# Marker Detection Logic
+def marker_detection():
+    global marker_running
+    aruco_marker_image = cv2.imread('marker.jpg')
+    if aruco_marker_image is None:
+        print("Error: ArUco marker image not found.")
+        return
+
+    aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
+    parameters = aruco.DetectorParameters_create()
+
+    print('Loading the pre-defined ArUco marker...')
+    
+    cap = cv2.VideoCapture(VIDEO_URL)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROCESSING_HEIGHT)
+
+    if not cap.isOpened():
+        print("Error: Could not open camera.")
+        return
+
+    while marker_running:
+        ret, frame = cap.read()
+        if not ret or frame is None:
+            print("Error: Frame not retrieved.")
+            break
+
+        corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
+
+        if ids is not None:
+            for i in range(len(ids)):
+                detected_marker_id = ids[i][0]
+                corner = corners[i].reshape((4, 2))
+                (topLeft, topRight, bottomRight, bottomLeft) = corner
+
+                x1, y1 = topLeft
+                x2, y2 = bottomRight
+                center_x = int((x1 + x2) / 2)
+                center_y = int((y1 + y2) / 2)
+
+                image_center_x = frame.shape[1] // 2
+                image_center_y = frame.shape[0] // 2
+
+                angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
+                angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+
+                print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}")
+
+                # Send marker data over UDP
+                marker_data = {
+                    "type": "marker",
+                    "markerId": detected_marker_id,
+                    "angle_x": round(float(angle_x), 3),
+                    "angle_y": round(float(angle_y), 3),
+                    "timestamp": int(time.time() * 1000)
+                }
+                send_udp_message(marker_data)
+
+        time.sleep(0.1)
+
+    cap.release()
+    print("Marker detection stopped.")
 
 def handle_command(command):
-    global attitude_running
+    global attitude_running, marker_running
     if command == "stop_attitude":
         attitude_running = False
-        settings["enable_attitude_control"] = False  # Update setting
-        save_config()  # Save updated setting to file
+        settings["enable_attitude_control"] = False
+        save_config()
         print("Attitude control stopped.")
     elif command == "start_attitude":
-        if not attitude_running:  # Only start if not already running
+        if not attitude_running:
             attitude_running = True
-            settings["enable_attitude_control"] = True  # Update setting
-            save_config()  # Save updated setting to file
-            threading.Thread(target=attitude_control, daemon=True).start()  # Always start a new thread
+            settings["enable_attitude_control"] = True
+            save_config()
+            print("Starting attitude control thread...")
+            threading.Thread(target=attitude_control, daemon=True).start()
             print("Attitude control started.")
+    elif command == "stop_marker":
+        marker_running = False
+        settings["enable_marker_detection"] = False
+        save_config()
+        print("Marker detection stopped.")
+    elif command == "start_marker":
+        if not marker_running:
+            marker_running = True
+            settings["enable_marker_detection"] = True
+            save_config()
+            print("Starting marker detection thread...")
+            threading.Thread(target=marker_detection, daemon=True).start()
+            print("Marker detection started.")
     else:
         print(f"Unknown command: {command}")
 
@@ -138,10 +222,14 @@ def main():
     if server_socket is None:
         return  # Exit if the socket creation failed
 
-    # Start attitude control if enabled
+    # Start attitude and marker detection if enabled
     if settings.get("enable_attitude_control", False):
         attitude_running = True
         threading.Thread(target=attitude_control, daemon=True).start()
+
+    if settings.get("enable_marker_detection", False):
+        marker_running = True
+        threading.Thread(target=marker_detection, daemon=True).start()
 
     while True:
         conn, _ = server_socket.accept()
@@ -152,3 +240,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
