@@ -39,12 +39,12 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 def create_socket():
     if os.path.exists(SOCKET_PATH):
         print("Removing existing socket")
-        os.remove(SOCKET_PATH)  # Remove the socket if it already exists
+        os.remove(SOCKET_PATH)
     try:
         print("Creating socket...")
         server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         server.bind(SOCKET_PATH)
-        server.listen(1)  # Listen for incoming connections
+        server.listen(1)
         print(f"Socket created and listening at {SOCKET_PATH}")
         return server
     except socket.error as e:
@@ -69,10 +69,14 @@ def save_config():
 
 load_config()
 # MAVLink connection
-master = mavutil.mavlink_connection('udpin:localhost:14550')
-print("TRYING TO CONNECT TO TCP PORT")
-master.wait_heartbeat()
-print("Connected to MAVLink")
+try:
+    master = mavutil.mavlink_connection('udpin:localhost:14550')
+    print("TRYING TO CONNECT TO TCP PORT")
+    master.wait_heartbeat()
+    print("Connected to MAVLink")
+except Exception as e:
+    print(f"Failed to connect to MAVLink: {e}")
+    exit(1)
 
 def send_udp_message(data):
     message_json = json.dumps(data)
@@ -144,43 +148,48 @@ def marker_detection():
         return
 
     while marker_running:
-        ret, frame = cap.read()
-        if not ret or frame is None:
-            print("Error: Frame not retrieved.")
+        try:
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                print("Error: Frame not retrieved.")
+                break
+
+            corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
+
+            if ids is not None:
+                for i in range(len(ids)):
+                    detected_marker_id = ids[i][0]
+                    corner = corners[i].reshape((4, 2))
+                    (topLeft, topRight, bottomRight, bottomLeft) = corner
+
+                    x1, y1 = topLeft
+                    x2, y2 = bottomRight
+                    center_x = int((x1 + x2) / 2)
+                    center_y = int((y1 + y2) / 2)
+
+                    image_center_x = frame.shape[1] // 2
+                    image_center_y = frame.shape[0] // 2
+
+                    angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
+                    angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+
+                    print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}")
+
+                    # Send marker data over UDP
+                    marker_data = {
+                        "type": "marker",
+                        "markerId": detected_marker_id,
+                        "angle_x": round(float(angle_x), 3),
+                        "angle_y": round(float(angle_y), 3),
+                        "timestamp": int(time.time() * 1000)
+                    }
+                    send_udp_message(marker_data)
+
+            time.sleep(0.1)
+
+        except Exception as e:
+            print(f"Error in marker detection: {e}")
             break
-
-        corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
-
-        if ids is not None:
-            for i in range(len(ids)):
-                detected_marker_id = ids[i][0]
-                corner = corners[i].reshape((4, 2))
-                (topLeft, topRight, bottomRight, bottomLeft) = corner
-
-                x1, y1 = topLeft
-                x2, y2 = bottomRight
-                center_x = int((x1 + x2) / 2)
-                center_y = int((y1 + y2) / 2)
-
-                image_center_x = frame.shape[1] // 2
-                image_center_y = frame.shape[0] // 2
-
-                angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
-                angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
-
-                print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}")
-
-                # Send marker data over UDP
-                marker_data = {
-                    "type": "marker",
-                    "markerId": detected_marker_id,
-                    "angle_x": round(float(angle_x), 3),
-                    "angle_y": round(float(angle_y), 3),
-                    "timestamp": int(time.time() * 1000)
-                }
-                send_udp_message(marker_data)
-
-        time.sleep(0.1)
 
     cap.release()
     print("Marker detection stopped.")
