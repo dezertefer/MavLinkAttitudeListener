@@ -14,8 +14,8 @@ import socket
 SOCKET_PATH = "/tmp/attitudeForward.sock"
 config_file_path = "/home/cdc/MavLinkAttitudeListener/config.json"
 
-CLIENT_IP = "127.0.0.1"  # Client address
-CLIENT_PORT = 13370    # Client port to send data to
+UDP_IP = "127.0.0.1"  # Client address
+UDP_PORT = 13370    # Client port to send data to
 
 # Constants for ArUco detection
 PROCESSING_WIDTH = 320
