@@ -10,14 +10,12 @@ CLIENT_PORT = 13370    # Client port to send data to
 
 # Message to be sent
 message = {
-    "values": [
-        -1.459,
-        -29.513,
-        -172.529
-    ],
-    "timestamp": 1729598070850,
-    "accuracy": 3
+"markerId": 500, # Use standard int
+"angle_x": 3.333, # Convert NumPy float to Python float
+"angle_y": 4.444, # Convert NumPy float to Python float
+"distance": 0.3 # Ensure distance is a standard float
 }
+
 
 # Convert the message to JSON
 message_json = json.dumps(message)
