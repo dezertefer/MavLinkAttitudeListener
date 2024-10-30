@@ -163,10 +163,10 @@ def attitude_control():
                     roll, pitch = pitch, roll
                     
                 #send_ws_message(yaw, pitch, roll)
-                send_udp_message({"type": "attitude", "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)], "timestamp": int(time.time() * 1000), "accuracy": 3})
+                send_udp_message({"type": "attitude", "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)], "timestamp": int(time.time() * 1000)})
             elif message and message.get_type() == 'DISTANCE_SENSOR':
                 distance_rangefinder = message.current_distance / 100.0  # Distance in meters
-                print(f"Rangefinder Distance: {distance_rangefinder} meters")
+                #print(f"Rangefinder Distance: {distance_rangefinder} meters")
                 
                 
         except Exception as e:
@@ -221,7 +221,7 @@ def marker_detection():
 
         if not ret or frame is None:
             print("Error: Frame not retrieved.")
-            break
+            #break
 
         frn += 1
         if frn % PROCESSING_INTERVAL != 0:
@@ -245,11 +245,14 @@ def marker_detection():
 
                 angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
                 angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+                #angle_x = -angle_x
+                #angle_y = -angle_y
 
                 print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}, Distance={distance_rangefinder}")
 
                 # Send marker data over the second WebSocket
                 marker_data = {
+		    "type": "marker",
                     "markerId": int(detected_marker_id),  # Use standard int
                     "angle_x": round(float(angle_x), 3),  # Convert NumPy float to Python float
                     "angle_y": round(float(angle_y), 3),  # Convert NumPy float to Python float
@@ -257,15 +260,15 @@ def marker_detection():
                 }
                 send_landing_target(angle_x,angle_y)
                 #marker_ws.send(json.dumps(marker_data))
-                print(f"Sent over marker WebSocket: {marker_data}")
+                print(f"Sent over marker: {marker_data}")
                                     # Send marker data over UDP
-                marker_data = {
-                    "type": "marker",
-                    "markerId": detected_marker_id,
-                    "angle_x": round(float(angle_x), 3),
-                    "angle_y": round(float(angle_y), 3),
-                    "timestamp": int(time.time() * 1000)
-                }
+#                marker_data = {
+ #                   "type": "marker",
+  #                  "markerId": detected_marker_id,
+   #                 "angle_x": round(float(angle_x), 3),
+    #                "angle_y": round(float(angle_y), 3),
+     #               "timestamp": int(time.time() * 1000)
+      #          }
                 send_udp_message(marker_data)
         
         #time.sleep(0.01)
