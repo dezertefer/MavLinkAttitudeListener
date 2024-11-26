@@ -114,6 +114,27 @@ def marker_detection():
     aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
     parameters = aruco.DetectorParameters_create()
 
+        print('Loading the pre-defined ArUco marker...')
+        # Create a margin around the pre-defined marker
+    margin_size = 20
+    color = [255, 255, 255]  # White color for margin
+    # Get original dimensions
+    height, width, channels = aruco_marker_image.shape
+    # Create a new image with margin
+    new_height = height + 2 * margin_size
+    new_width = width + 2 * margin_size
+    image_with_margin = np.full((new_height, new_width, channels), color, dtype=np.uint8)
+    # Place the original marker in the center of the new image
+    image_with_margin[margin_size:margin_size + height, margin_size:margin_size + width] = aruco_marker_image
+    corners, ids, rejected = aruco.detectMarkers(image_with_margin, aruco_dict, parameters=parameters)
+    # Check if a valid marker was found in the pre-loaded image
+    if ids is None:
+        print('Error: Invalid ArUco marker in the pre-loaded image.')
+        return
+    else:
+        print(f"Pre-loaded marker detected, ID: {ids[0][0]}")
+    # Continue with live video stream detection
+    
     cap = cv2.VideoCapture(VIDEO_URL)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROCESSING_HEIGHT)
