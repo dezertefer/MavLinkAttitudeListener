@@ -160,9 +160,15 @@ def marker_detection():
                     "angle_y": round(float(angle_y), 3),
                     "distance": round(float(distance_rangefinder), 3)
                 }
+                send_landing_target(angle_x,angle_y)
                 send_udp_message(marker_data)
 
     cap.release()
+
+def send_landing_target(angle_x, angle_y, distance=0.0):
+    master.mav.landing_target_send(
+        int(time.time() * 1000000),
+        0, mavutil.mavlink.MAV_FRAME_BODY_NED, angle_x, angle_y, distance_rangefinder, 0.0, 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0], 0, 0)
 
 def handle_command(command):
     global attitude_running, marker_running
