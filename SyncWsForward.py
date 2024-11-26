@@ -114,8 +114,8 @@ def marker_detection():
     aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
     parameters = aruco.DetectorParameters_create()
 
-        print('Loading the pre-defined ArUco marker...')
-        # Create a margin around the pre-defined marker
+    print('Loading the pre-defined ArUco marker...')
+    # Create a margin around the pre-defined marker
     margin_size = 20
     color = [255, 255, 255]  # White color for margin
     # Get original dimensions
