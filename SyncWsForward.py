@@ -206,7 +206,10 @@ def marker_detection():
                         # Send the marker's data repeatedly as long as it's detected
                         send_landing_target(angle_x, angle_y)
                         send_udp_message(marker_data)
-                        break
+                        message_json = json.dumps(marker_data)
+                        #sock.sendto(message_json.encode(), (UDP_IP, UDP_PORT))
+                        print(f"Sent message to {UDP_IP}:{UDP_PORT}: {message_json}")
+                        #break
 
     cap.release()
 
