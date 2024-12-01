@@ -60,7 +60,7 @@ if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
 def send_udp_message(data):
     message_json = json.dumps(data)
     sock.sendto(message_json.encode(), (UDP_IP, UDP_PORT))
-    print(f"Sent message to {UDP_IP}:{UDP_PORT}: {message_json}")
+    #print(f"Sent message to {UDP_IP}:{UDP_PORT}: {message_json}")
 
 # MAVLink request for message intervals
 def request_message_interval(message_id: int, frequency_hz: float):
@@ -202,6 +202,8 @@ def marker_detection():
                 }
 
                 # Send the marker's data
+                message_json = json.dumps(data)
+                print(f"Sent message to {UDP_IP}:{UDP_PORT}: {message_json}")
                 send_landing_target(angle_x, angle_y)
                 send_udp_message(marker_data)
 
