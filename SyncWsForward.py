@@ -72,6 +72,7 @@ def request_message_interval(message_id: int, frequency_hz: float):
     )
 
 distance_rangefinder = 0.0  # Default distance value
+highest_priority_detected = None
 
 # Attitude Control Logic
 def attitude_control():
@@ -103,7 +104,7 @@ def attitude_control():
 
 # Marker Detection Logic
 def marker_detection():
-    global marker_running, distance_rangefinder
+    global marker_running, distance_rangefinder, highest_priority_detected
     request_message_interval(mavutil.mavlink.MAVLINK_MSG_ID_DISTANCE_SENSOR, settings['attitude_frequency'])
 
     aruco_marker_image = cv2.imread('marker.jpg')
@@ -161,15 +162,23 @@ def marker_detection():
         MARKER_PRIORITIES = {500: 1, 501: 2, 502: 3}
 
         if ids is not None:
-            # Filter and sort markers based on priority
+        # Filter and sort markers based on priority
             valid_markers = [
-                (ids[i][0], corners[i]) for i in range(len(ids)) if ids[i][0] in MARKER_PRIORITIES
-            ]
+            (ids[i][0], corners[i]) for i in range(len(ids)) if ids[i][0] in MARKER_PRIORITIES
+            ]   
             valid_markers.sort(key=lambda marker: MARKER_PRIORITIES[marker[0]])
 
-            # Process only the highest-priority marker
-            if valid_markers:
-                detected_marker_id, corner = valid_markers[0]
+            # Process markers in priority order
+            for detected_marker_id, corner in valid_markers:
+                # Check if a higher-priority marker was already detected
+                if highest_priority_detected is not None and \
+                   MARKER_PRIORITIES[detected_marker_id] >= MARKER_PRIORITIES[highest_priority_detected]:
+                    continue
+
+                # Update the highest-priority marker detected
+                highest_priority_detected = detected_marker_id
+
+                # Extract corner data and compute angles
                 corner = corner.reshape((4, 2))
                 (topLeft, topRight, bottomRight, bottomLeft) = corner
 
@@ -192,9 +201,12 @@ def marker_detection():
                     "distance": round(float(distance_rangefinder), 3)
                 }
 
-                # Send the highest-priority marker's data
+                # Send the marker's data
                 send_landing_target(angle_x, angle_y)
                 send_udp_message(marker_data)
+
+                # Stop processing after sending the first valid marker
+                break
 
     cap.release()
 
