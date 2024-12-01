@@ -158,35 +158,75 @@ def marker_detection():
         corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
 
         if ids is not None:
+            found_marker_501 = False
+
             for i in range(len(ids)):
                 detected_marker_id = ids[i][0]
-                corner = corners[i].reshape((4, 2))
-                (topLeft, topRight, bottomRight, bottomLeft) = corner
 
-                x1, y1 = topLeft
-                x2, y2 = bottomRight
-                center_x = int((x1 + x2) / 2)
-                center_y = int((y1 + y2) / 2)
+                if detected_marker_id == 501:
+                    found_marker_501 = True
+                    corner = corners[i].reshape((4, 2))
+                    (topLeft, topRight, bottomRight, bottomLeft) = corner
 
-                image_center_x = frame.shape[1] // 2
-                image_center_y = frame.shape[0] // 2
+                    x1, y1 = topLeft
+                    x2, y2 = bottomRight
+                    center_x = int((x1 + x2) / 2)
+                    center_y = int((y1 + y2) / 2)
 
-                angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
-                angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+                    image_center_x = frame.shape[1] // 2
+                    image_center_y = frame.shape[0] // 2
 
-                marker_data = {
-                    "type": "marker",
-                    "markerId": int(detected_marker_id),
-                    "angle_x": round(float(angle_x), 3),
-                    "angle_y": round(float(angle_y), 3),
-                    "distance": round(float(distance_rangefinder), 3)
-                }
-                send_landing_target(angle_x,angle_y)
-                send_udp_message(marker_data)
+                    angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
+                    angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+
+                    marker_data = {
+                        "type": "marker",
+                        "markerId": int(detected_marker_id),
+                        "angle_x": round(float(angle_x), 3),
+                        "angle_y": round(float(angle_y), 3),
+                        "distance": round(float(distance_rangefinder), 3)
+                    }
+                    send_landing_target(angle_x, angle_y)
+                    send_udp_message(marker_data)
+                    break  # Stop processing other markers
+
+            # If marker 501 is not found, process other markers normally
+            if not found_marker_501:
+                for i in range(len(ids)):
+                    detected_marker_id = ids[i][0]
+                    
+                    # Skip processing marker 501 again if it's found in the above loop
+                    if detected_marker_id == 501:
+                        continue
+
+                    corner = corners[i].reshape((4, 2))
+                    (topLeft, topRight, bottomRight, bottomLeft) = corner
+
+                    x1, y1 = topLeft
+                    x2, y2 = bottomRight
+                    center_x = int((x1 + x2) / 2)
+                    center_y = int((y1 + y2) / 2)
+
+                    image_center_x = frame.shape[1] // 2
+                    image_center_y = frame.shape[0] // 2
+
+                    angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
+                    angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+
+                    marker_data = {
+                        "type": "marker",
+                        "markerId": int(detected_marker_id),
+                        "angle_x": round(float(angle_x), 3),
+                        "angle_y": round(float(angle_y), 3),
+                        "distance": round(float(distance_rangefinder), 3)
+                    }
+                    send_landing_target(angle_x, angle_y)
+                    send_udp_message(marker_data)
 
     cap.release()
 
-def send_landing_target(angle_x, angle_y, distance=0.0):
+def send_landing_target(angle_x, angle_y):
+    global distance_rangefinder
     master.mav.landing_target_send(
         int(time.time() * 1000000),
         0, mavutil.mavlink.MAV_FRAME_BODY_NED, angle_x, angle_y, distance_rangefinder, 0.0, 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0], 0, 0)
