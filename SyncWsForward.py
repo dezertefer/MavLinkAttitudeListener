@@ -157,71 +157,44 @@ def marker_detection():
 
         corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
 
+        # Define marker priorities
+        MARKER_PRIORITIES = {500: 1, 501: 2, 502: 3}
+
         if ids is not None:
-            found_marker_501 = False
+            # Filter and sort markers based on priority
+            valid_markers = [
+                (ids[i][0], corners[i]) for i in range(len(ids)) if ids[i][0] in MARKER_PRIORITIES
+            ]
+            valid_markers.sort(key=lambda marker: MARKER_PRIORITIES[marker[0]])
 
-            for i in range(len(ids)):
-                detected_marker_id = ids[i][0]
+            # Process only the highest-priority marker
+            if valid_markers:
+                detected_marker_id, corner = valid_markers[0]
+                corner = corner.reshape((4, 2))
+                (topLeft, topRight, bottomRight, bottomLeft) = corner
 
-                if detected_marker_id == 501:
-                    found_marker_501 = True
-                    corner = corners[i].reshape((4, 2))
-                    (topLeft, topRight, bottomRight, bottomLeft) = corner
+                x1, y1 = topLeft
+                x2, y2 = bottomRight
+                center_x = int((x1 + x2) / 2)
+                center_y = int((y1 + y2) / 2)
 
-                    x1, y1 = topLeft
-                    x2, y2 = bottomRight
-                    center_x = int((x1 + x2) / 2)
-                    center_y = int((y1 + y2) / 2)
+                image_center_x = frame.shape[1] // 2
+                image_center_y = frame.shape[0] // 2
 
-                    image_center_x = frame.shape[1] // 2
-                    image_center_y = frame.shape[0] // 2
+                angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
+                angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
 
-                    angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
-                    angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+                marker_data = {
+                    "type": "marker",
+                    "markerId": int(detected_marker_id),
+                    "angle_x": round(float(angle_x), 3),
+                    "angle_y": round(float(angle_y), 3),
+                    "distance": round(float(distance_rangefinder), 3)
+                }
 
-                    marker_data = {
-                        "type": "marker",
-                        "markerId": int(detected_marker_id),
-                        "angle_x": round(float(angle_x), 3),
-                        "angle_y": round(float(angle_y), 3),
-                        "distance": round(float(distance_rangefinder), 3)
-                    }
-                    send_landing_target(angle_x, angle_y)
-                    send_udp_message(marker_data)
-                    break  # Stop processing other markers
-
-            # If marker 501 is not found, process other markers normally
-            if not found_marker_501:
-                for i in range(len(ids)):
-                    detected_marker_id = ids[i][0]
-                    
-                    # Skip processing marker 501 again if it's found in the above loop
-                    if detected_marker_id == 501:
-                        continue
-
-                    corner = corners[i].reshape((4, 2))
-                    (topLeft, topRight, bottomRight, bottomLeft) = corner
-
-                    x1, y1 = topLeft
-                    x2, y2 = bottomRight
-                    center_x = int((x1 + x2) / 2)
-                    center_y = int((y1 + y2) / 2)
-
-                    image_center_x = frame.shape[1] // 2
-                    image_center_y = frame.shape[0] // 2
-
-                    angle_x = ((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
-                    angle_y = ((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
-
-                    marker_data = {
-                        "type": "marker",
-                        "markerId": int(detected_marker_id),
-                        "angle_x": round(float(angle_x), 3),
-                        "angle_y": round(float(angle_y), 3),
-                        "distance": round(float(distance_rangefinder), 3)
-                    }
-                    send_landing_target(angle_x, angle_y)
-                    send_udp_message(marker_data)
+                # Send the highest-priority marker's data
+                send_landing_target(angle_x, angle_y)
+                send_udp_message(marker_data)
 
     cap.release()
 
