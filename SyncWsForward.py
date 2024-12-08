@@ -51,20 +51,20 @@ settings = {
 }
 
 
- def create_socket():
-     if os.path.exists(SOCKET_PATH):
-         print("Removing existing socket")
-         os.remove(SOCKET_PATH)  # Remove the socket if it already exists
-     try:
-         print("Creating socket...")
-         server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-         server.bind(SOCKET_PATH)
-         server.listen(1)  # Listen for incoming connections
-         print(f"Socket created and listening at {SOCKET_PATH}")
-         return server
-     except socket.error as e:
-         print(f"Socket creation failed: {e}")
-         return None
+def create_socket():
+    if os.path.exists(SOCKET_PATH):
+        print("Removing existing socket")
+        os.remove(SOCKET_PATH)  # Remove the socket if it already exists
+    try:
+        print("Creating socket...")
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(SOCKET_PATH)
+        server.listen(1)  # Listen for incoming connections
+        print(f"Socket created and listening at {SOCKET_PATH}")
+        return server
+    except socket.error as e:
+        print(f"Socket creation failed: {e}")
+        return None
 # Global control flags for the threads
 attitude_running = False
 marker_running = False
