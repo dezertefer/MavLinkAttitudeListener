@@ -5,8 +5,6 @@
     "swap_pitch_roll": false,
     "reverse_yaw": false,
     "fixed_yaw_angle": null,
-    "ws_url": "ws://3.91.74.146:8485",
-    "marker_ws_url": "ws://3.91.74.146:8486",
     "enable_attitude_control": true,
     "enable_marker_detection": true
 }
