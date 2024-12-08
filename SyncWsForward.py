@@ -9,14 +9,7 @@ from pymavlink import mavutil
 import json
 import os
 import socket
-import logging
 
-# Configure the logging system
-# logging.basicConfig(
-#    filename='log.txt',
-#    level=logging.INFO,  # Set the logging level to INFO
-#    format='%(asctime)s - %(levelname)s - %(message)s'  # Define the log message format
-# )
 
 # Path for UNIX domain socket file
 SOCKET_PATH = "/tmp/attitudeForward.sock"
@@ -26,14 +19,14 @@ UDP_IP = "127.0.0.1"  # Client address
 UDP_PORT = 14440    # Client port to send data to
 
 # Constants for ArUco detection
-PROCESSING_WIDTH = 200
-PROCESSING_HEIGHT = 200
 VIDEO_URL = 'rtsp://127.0.0.1:8554/cam'
+#VIDEO_URL = 'http://127.0.0.1/cam/mjpeg'
 FOV_X = 4.18879  # 240 degrees in radians
 FOV_Y = 4.18879  # 240 degrees in radians
 PROCESSING_INTERVAL = 1
 
 MARKER_SWITCH_FRAME_COUNT = 75
+ENABLE_MEDIAN_FILTER = False
 MEDIAN_FILTER_WIN_SIZE = 9
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -46,6 +39,8 @@ settings = {
     "swap_pitch_roll": False,
     "reverse_yaw": False,
     "fixed_yaw_angle": None,
+    "ws_url": "ws://3.91.74.146:8485",  # WebSocket URL for attitude data
+    "marker_ws_url": "ws://3.91.74.146:8486",  # WebSocket URL for marker detection data
     "enable_attitude_control": True,
     "enable_marker_detection": True
 }
@@ -91,12 +86,12 @@ master.wait_heartbeat()
 if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
     master.port.flushInput()
 
-# # WebSocket connection
-# ws = websocket.WebSocket()
-# ws.connect(settings["ws_url"])
+# WebSocket connection
+ws = websocket.WebSocket()
+ws.connect(settings["ws_url"])
 
-# marker_ws = websocket.WebSocket()
-# marker_ws.connect(settings["marker_ws_url"])
+marker_ws = websocket.WebSocket()
+marker_ws.connect(settings["marker_ws_url"])
 
 # Function to send landing target message via MAVLink
 def send_udp_message(data):
@@ -110,23 +105,23 @@ def send_landing_target(angle_x, angle_y, distance=0.0):
         0, mavutil.mavlink.MAV_FRAME_BODY_NED, angle_x, angle_y, distance_rangefinder, 0.0, 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0], 0, 0)
 
 # Function to send angular offsets over WebSocket
-# def send_ws_message(*angles):
-#     if len(angles) == 3:
-#         yaw, pitch, roll = angles
-#         timestamp = int(time.time() * 1000)
-#         data = {
-#             "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
-#             "timestamp": timestamp,
-#             "accuracy": 3
-#         }
-#         message = json.dumps(data)
-#         ws.send(message)
-#  #       print(f"Sent over WebSocket: {message}")
-#     elif len(angles) == 2:
-#         # If only angle_x and angle_y are provided, do nothing
-#         pass
-#     else:
-#         raise ValueError("Invalid number of arguments for send_ws_message()")
+def send_ws_message(*angles):
+    if len(angles) == 3:
+        yaw, pitch, roll = angles
+        timestamp = int(time.time() * 1000)
+        data = {
+            "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
+            "timestamp": timestamp,
+            "accuracy": 3
+        }
+        message = json.dumps(data)
+        ws.send(message)
+ #       print(f"Sent over WebSocket: {message}")
+    elif len(angles) == 2:
+        # If only angle_x and angle_y are provided, do nothing
+        pass
+    else:
+        raise ValueError("Invalid number of arguments for send_ws_message()")
 
 def request_message_interval(message_id: int, frequency_hz: float):
     print(f"Requesting message {message_id} at {frequency_hz} Hz")
@@ -204,6 +199,32 @@ class MedianFilter:
         return sorted_data_list[len(sorted_data_list) // 2][:2]
 
 
+def reconnect():
+    # Continue with live video stream detection
+    while True:
+        # Initialize video capture
+        cap = cv2.VideoCapture(VIDEO_URL)
+
+        if cap.isOpened():
+            cap.grab()
+            ret, frame = cap.retrieve()
+
+            if ret and frame is not None:
+                # Allow a small resolution tracking only
+                if frame.shape[1] <= 500:
+                    break
+
+        print("Error: Could not open camera. reconnecting...")
+        cap.release()
+        time.sleep(5)
+
+    # skip buffered things
+    for _ in range(30):
+        cap.grab()
+
+    return cap
+
+
 # Marker Detection Logic
 def marker_detection():
     global marker_running, distance_rangefinder
@@ -223,7 +244,8 @@ def marker_detection():
     color = [255, 255, 255]  # White color for margin
 
     marker_id_list = []
-    medianFilter = MedianFilter()
+    if ENABLE_MEDIAN_FILTER:
+        medianFilter = MedianFilter()
 
     # Verify aruco markers
     for aruco_marker_image in [aruco_marker_image_1, aruco_marker_image_2, aruco_marker_image_3]:
@@ -244,29 +266,7 @@ def marker_detection():
             print(f"Pre-loaded marker-{len(marker_id_list) + 1} detected, ID: {ids[0][0]}")
             marker_id_list.append(ids[0][0])
 
-    # Continue with live video stream detection
-    while True:
-        # Initialize video capture
-        cap = cv2.VideoCapture(VIDEO_URL)
-
-        # Set lower resolution for better performance on RPI Zero 2W
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROCESSING_WIDTH)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROCESSING_HEIGHT)
-
-        if cap.isOpened():
-            cap.grab()
-            ret, frame = cap.retrieve()
-            
-            if ret:
-                break
-            
-        print("Error: Could not open camera. reconnecting...")
-        cap.release()
-        time.sleep(5)
-        
-    # skip buffered things
-    for _ in range(30):
-        cap.grab()
+    cap = reconnect()
 
     frn = 0
     tracking_higher_id_count = 0
@@ -278,7 +278,11 @@ def marker_detection():
 
         if not ret or frame is None:
             print("Error: Frame not retrieved.")
-            #break
+            cap.release()
+            print("Reconnecting...")
+            cap = reconnect()
+            print("Reconnected.")
+            continue
 
         frn += 1
         if frn % PROCESSING_INTERVAL != 0:
@@ -287,7 +291,6 @@ def marker_detection():
         corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
 
         if ids is not None:
-            # logging.info(f'ids: {ids}, corners: {corners}')
             detected_marker_id_list = [ids[i][0] for i in range(len(ids)) if ids[i][0] in marker_id_list]
             detected_corner_list = [corners[i] for i in range(len(ids)) if ids[i][0] in marker_id_list]
             i, higher_id = None, -1
@@ -318,17 +321,18 @@ def marker_detection():
                     center_x = (x1 + x2 + x3 + x4) / 4
                     center_y = (y1 + y2 + y3 + y4) / 4
 
-                    image_center_x = frame.shape[1] // 2
-                    image_center_y = frame.shape[0] // 2
+                    HEIGHT, WIDTH = frame.shape[0], frame.shape[1]
+                    image_center_x = WIDTH // 2
+                    image_center_y = HEIGHT // 2
 
-                    angle_x = -((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
-                    angle_y = -((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
+                    angle_x = -((center_x - image_center_x) / WIDTH) * FOV_X
+                    angle_y = -((center_y - image_center_y) / HEIGHT) * FOV_Y
 
-                    #(angle_x, angle_y) = medianFilter.apply([angle_x, angle_y], detected_marker_id)
-
+                    if ENABLE_MEDIAN_FILTER:
+                        (angle_x, angle_y) = medianFilter.apply([angle_x, angle_y], detected_marker_id)
 
                     print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}, Distance={distance_rangefinder}")
-                    # logging.info(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}, Distance={distance_rangefinder}")
+
                     # Send marker data over the second WebSocket
                     marker_data = {
                 "type": "marker",
