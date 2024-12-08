@@ -9,6 +9,14 @@ from pymavlink import mavutil
 import json
 import os
 import socket
+import logging
+
+# Configure the logging system
+# logging.basicConfig(
+#    filename='log.txt',
+#    level=logging.INFO,  # Set the logging level to INFO
+#    format='%(asctime)s - %(levelname)s - %(message)s'  # Define the log message format
+# )
 
 # Path for UNIX domain socket file
 SOCKET_PATH = "/tmp/attitudeForward.sock"
@@ -38,27 +46,25 @@ settings = {
     "swap_pitch_roll": False,
     "reverse_yaw": False,
     "fixed_yaw_angle": None,
-    "ws_url": "ws://3.91.74.146:8485",  # WebSocket URL for attitude data
-    "marker_ws_url": "ws://3.91.74.146:8486",  # WebSocket URL for marker detection data
     "enable_attitude_control": True,
     "enable_marker_detection": True
 }
 
 
-def create_socket():
-    if os.path.exists(SOCKET_PATH):
-        print("Removing existing socket")
-        os.remove(SOCKET_PATH)  # Remove the socket if it already exists
-    try:
-        print("Creating socket...")
-        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        server.bind(SOCKET_PATH)
-        server.listen(1)  # Listen for incoming connections
-        print(f"Socket created and listening at {SOCKET_PATH}")
-        return server
-    except socket.error as e:
-        print(f"Socket creation failed: {e}")
-        return None
+ def create_socket():
+     if os.path.exists(SOCKET_PATH):
+         print("Removing existing socket")
+         os.remove(SOCKET_PATH)  # Remove the socket if it already exists
+     try:
+         print("Creating socket...")
+         server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+         server.bind(SOCKET_PATH)
+         server.listen(1)  # Listen for incoming connections
+         print(f"Socket created and listening at {SOCKET_PATH}")
+         return server
+     except socket.error as e:
+         print(f"Socket creation failed: {e}")
+         return None
 # Global control flags for the threads
 attitude_running = False
 marker_running = False
@@ -85,12 +91,12 @@ master.wait_heartbeat()
 if hasattr(master, 'port') and hasattr(master.port, 'flushInput'):
     master.port.flushInput()
 
-# WebSocket connection
-ws = websocket.WebSocket()
-ws.connect(settings["ws_url"])
+# # WebSocket connection
+# ws = websocket.WebSocket()
+# ws.connect(settings["ws_url"])
 
-marker_ws = websocket.WebSocket()
-marker_ws.connect(settings["marker_ws_url"])
+# marker_ws = websocket.WebSocket()
+# marker_ws.connect(settings["marker_ws_url"])
 
 # Function to send landing target message via MAVLink
 def send_udp_message(data):
@@ -104,23 +110,23 @@ def send_landing_target(angle_x, angle_y, distance=0.0):
         0, mavutil.mavlink.MAV_FRAME_BODY_NED, angle_x, angle_y, distance_rangefinder, 0.0, 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0], 0, 0)
 
 # Function to send angular offsets over WebSocket
-def send_ws_message(*angles):
-    if len(angles) == 3:
-        yaw, pitch, roll = angles
-        timestamp = int(time.time() * 1000)
-        data = {
-            "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
-            "timestamp": timestamp,
-            "accuracy": 3
-        }
-        message = json.dumps(data)
-        ws.send(message)
- #       print(f"Sent over WebSocket: {message}")
-    elif len(angles) == 2:
-        # If only angle_x and angle_y are provided, do nothing
-        pass
-    else:
-        raise ValueError("Invalid number of arguments for send_ws_message()")
+# def send_ws_message(*angles):
+#     if len(angles) == 3:
+#         yaw, pitch, roll = angles
+#         timestamp = int(time.time() * 1000)
+#         data = {
+#             "values": [round(yaw, 3), round(pitch, 3), round(roll, 3)],
+#             "timestamp": timestamp,
+#             "accuracy": 3
+#         }
+#         message = json.dumps(data)
+#         ws.send(message)
+#  #       print(f"Sent over WebSocket: {message}")
+#     elif len(angles) == 2:
+#         # If only angle_x and angle_y are provided, do nothing
+#         pass
+#     else:
+#         raise ValueError("Invalid number of arguments for send_ws_message()")
 
 def request_message_interval(message_id: int, frequency_hz: float):
     print(f"Requesting message {message_id} at {frequency_hz} Hz")
@@ -281,7 +287,9 @@ def marker_detection():
         corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
 
         if ids is not None:
+            # logging.info(f'ids: {ids}, corners: {corners}')
             detected_marker_id_list = [ids[i][0] for i in range(len(ids)) if ids[i][0] in marker_id_list]
+            detected_corner_list = [corners[i] for i in range(len(ids)) if ids[i][0] in marker_id_list]
             i, higher_id = None, -1
             # higher id is a priority
             for j, detected_marker_id in enumerate(detected_marker_id_list):
@@ -300,13 +308,15 @@ def marker_detection():
                         tracking_higher_id = detected_marker_id
                         tracking_higher_id_count = MARKER_SWITCH_FRAME_COUNT
 
-                    corner = corners[i].reshape((4, 2))
+                    corner = detected_corner_list[i].reshape((4, 2))
                     (topLeft, topRight, bottomRight, bottomLeft) = corner
 
                     x1, y1 = topLeft
-                    x2, y2 = bottomRight
-                    center_x = int((x1 + x2) / 2)
-                    center_y = int((y1 + y2) / 2)
+                    x2, y2 = topRight
+                    x3, y3 = bottomRight
+                    x4, y4 = bottomLeft
+                    center_x = (x1 + x2 + x3 + x4) / 4
+                    center_y = (y1 + y2 + y3 + y4) / 4
 
                     image_center_x = frame.shape[1] // 2
                     image_center_y = frame.shape[0] // 2
@@ -314,10 +324,11 @@ def marker_detection():
                     angle_x = -((center_x - image_center_x) / PROCESSING_WIDTH) * FOV_X
                     angle_y = -((center_y - image_center_y) / PROCESSING_HEIGHT) * FOV_Y
 
-                    (angle_x, angle_y) = medianFilter.apply([angle_x, angle_y], detected_marker_id)
+                    #(angle_x, angle_y) = medianFilter.apply([angle_x, angle_y], detected_marker_id)
+
 
                     print(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}, Distance={distance_rangefinder}")
-
+                    # logging.info(f"Marker Detected: {detected_marker_id}, Angular Offsets: angle_x={angle_x}, angle_y={angle_y}, Distance={distance_rangefinder}")
                     # Send marker data over the second WebSocket
                     marker_data = {
                 "type": "marker",
@@ -339,9 +350,8 @@ def marker_detection():
           #          }
                     send_udp_message(marker_data)
 
-        # Return back to the previous id after MARKER_SWITCH_FRAME_COUNT frames. As is now, the lower IDs will be rembered if no
-		# higher IDs will be detected for more than (MARKER_SWITCH_FRAME_COUNT = 75) = 5 seconds concidering we have a frame rate of 15fps. To set it to completely forget the lower IDs, comment the line below. 
-        tracking_higher_id_count -= 1
+        # Return back to the previous id after MARKER_SWITCH_FRAME_COUNT frames
+        #tracking_higher_id_count -= 1
 
         #time.sleep(0.01)
 
