@@ -10,7 +10,7 @@ sudo apt install python3-opencv || { echo "Failed to install Python3, pip, or gi
 
 # Install required Python packages
 echo "Installing Python dependencies..."
-sudo pip3 install pymavlink websocket-client pyserial || { echo "Failed to install Python dependencies"; exit 1; }
+sudo pip3 install pymavlink websocket-client pyserial --break-system-packages || { echo "Failed to install Python dependencies"; exit 1; }
 
 python3 generate_aruco_marker.py --ids 500 501 502
 # Detect the current user
